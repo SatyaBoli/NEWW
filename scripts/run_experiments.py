@@ -20,9 +20,9 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
     gt_windows = loader.get_ground_truth_windows_by_series_id()
 
     if sample_series_ids is None:
-        # Benchmark subset representing various anomaly types:
-        # art_daily_jumpsup (7), ec2_cpu (11), ec2_disk (19), ambient_temp (34), nyc_taxi (38), twitter (48)
-        sample_series_ids = ["5", "7", "11", "13", "19", "28", "34", "38", "41", "48"]
+        # 5 diverse representative series:
+        # art_daily_flatmiddle (5), art_daily_jumpsup (7), ec2_cpu (11), ec2_cpu_5f5533 (13), ambient_temp (34)
+        sample_series_ids = ["5", "7", "11", "13", "34"]
 
     print(f"[Benchmark] Evaluating on {len(sample_series_ids)} representative series: {sample_series_ids}")
 

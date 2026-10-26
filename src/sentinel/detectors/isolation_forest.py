@@ -24,9 +24,9 @@ class StreamingIsolationForestDetector(BaseDetector):
         self,
         window_size: int = 100,
         warmup_steps: int = 40,
-        n_estimators: int = 50,
+        n_estimators: int = 30,
         contamination: float = 0.02,
-        retrain_interval: int = 50,
+        retrain_interval: int = 250,
         random_state: int = 42,
         version: str = "iforest-0.1.0",
     ) -> None:
