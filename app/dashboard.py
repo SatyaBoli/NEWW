@@ -73,8 +73,8 @@ det_type_map = {
 }
 
 threshold_mode = st.sidebar.selectbox("Thresholding Logic", ["likelihood", "robust_z"])
-enter_th = st.sidebar.slider("Enter Threshold", 1.5, 6.0, 3.2, 0.1)
-exit_th = st.sidebar.slider("Exit Threshold (Hysteresis)", 1.0, 4.0, 1.8, 0.1)
+enter_th = st.sidebar.slider("Enter Threshold", 1.5, 12.0, 6.5, 0.1)
+exit_th = st.sidebar.slider("Exit Threshold (Hysteresis)", 1.0, 6.0, 2.5, 0.1)
 drift_guard = st.sidebar.checkbox("Enable ADWIN Drift Guard", value=True)
 
 # Series selection
@@ -92,12 +92,18 @@ with tab1:
 
     if run_btn:
         with st.spinner("Streaming observations through Sentinel pipeline..."):
-            det_cfg = DetectorConfig(detector_type=det_type_map[detector_choice], ae_device="cuda")
+            det_cfg = DetectorConfig(
+                detector_type=det_type_map[detector_choice],
+                ae_device="cuda",
+                scale_floor=0.05,
+            )
             adapt_cfg = AdaptationConfig(
                 enter_threshold=enter_th,
                 exit_threshold=exit_th,
                 threshold_mode=threshold_mode,
                 drift_enabled=drift_guard,
+                min_event_length=3,
+                cooldown_steps=10,
             )
             pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
 
