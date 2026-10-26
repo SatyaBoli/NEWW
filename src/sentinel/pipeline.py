@@ -36,11 +36,13 @@ class SentinelPipeline:
         if d_type in ("rolling_mad", "mad", "baseline"):
             return RollingMedianMADDetector(
                 window_size=cfg.detector.window_size,
+                warmup_steps=cfg.adaptation.warmup_steps,
                 scale_floor=cfg.detector.scale_floor,
             )
         elif d_type == "ewma":
             return EWMADetector(
                 alpha=cfg.detector.ewma_alpha,
+                warmup_steps=cfg.adaptation.warmup_steps,
                 scale_floor=cfg.detector.scale_floor,
             )
         elif d_type in ("iforest", "isolation_forest"):
