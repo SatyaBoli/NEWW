@@ -3,10 +3,13 @@ from .base import BaseDetector
 from .ewma import EWMADetector
 from .isolation_forest import StreamingIsolationForestDetector
 from .rolling_mad import RollingMedianMADDetector
+from .tcn_autoencoder import CausalTCNAEDetector, TCNAEModule
 
 __all__ = [
     "BaseDetector",
+    "CausalTCNAEDetector",
     "EWMADetector",
     "RollingMedianMADDetector",
     "StreamingIsolationForestDetector",
+    "TCNAEModule",
 ]
