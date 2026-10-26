@@ -100,7 +100,7 @@ class AdaptationLayer:
             codes.append(BASELINE_UPDATE_SKIPPED)
 
         # 6. Update reference scorer & detector state
-        ctx.scorer.update(dec.anomaly_score, accepted)
+        ctx.scorer.update(out.raw_score, accepted)
         self.detector.update_state(point, is_anomalous=(not accepted))
 
         # 7. Formulate evidence record

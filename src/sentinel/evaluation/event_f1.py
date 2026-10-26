@@ -65,66 +65,93 @@ class EvaluationMetrics:
 
 def extract_predicted_events(records: Sequence[Mapping[str, Any]]) -> list[PredictedEvent]:
     """Group contiguous or cooldown-merged anomalous records into predicted events."""
-    events: list[PredictedEvent] = []
-    current_event: dict[str, Any] | None = None
+    events_by_id: dict[tuple[str, str], dict[str, Any]] = {}
+    fallback_events: list[PredictedEvent] = []
+    current_unlabeled: dict[str, Any] | None = None
 
     for r in records:
-        lbl = r["label"]
+        lbl = r.get("label")
         eid = r.get("event_id")
         ts = r["timestamp"]
-        sid = r["series_id"]
+        sid = str(r["series_id"])
 
-        if lbl == "ANOMALOUS" and eid:
-            if current_event and current_event["event_id"] == eid and current_event["series_id"] == sid:
-                current_event["end"] = ts
-                current_event["count"] += 1
+        if lbl == "ANOMALOUS":
+            if eid:
+                key = (sid, str(eid))
+                if key not in events_by_id:
+                    events_by_id[key] = {
+                        "series_id": sid,
+                        "event_id": str(eid),
+                        "start": ts,
+                        "end": ts,
+                        "first_trigger": ts,
+                        "count": 1,
+                    }
+                else:
+                    events_by_id[key]["end"] = ts
+                    events_by_id[key]["count"] += 1
             else:
-                if current_event:
-                    events.append(
-                        PredictedEvent(
-                            series_id=current_event["series_id"],
-                            event_id=current_event["event_id"],
-                            start=current_event["start"],
-                            end=current_event["end"],
-                            first_trigger=current_event["first_trigger"],
-                            points_count=current_event["count"],
+                if current_unlabeled and current_unlabeled["series_id"] == sid:
+                    current_unlabeled["end"] = ts
+                    current_unlabeled["count"] += 1
+                else:
+                    if current_unlabeled:
+                        fallback_events.append(
+                            PredictedEvent(
+                                series_id=current_unlabeled["series_id"],
+                                event_id="unlabeled",
+                                start=current_unlabeled["start"],
+                                end=current_unlabeled["end"],
+                                first_trigger=current_unlabeled["first_trigger"],
+                                points_count=current_unlabeled["count"],
+                            )
                         )
-                    )
-                current_event = {
-                    "series_id": sid,
-                    "event_id": eid,
-                    "start": ts,
-                    "end": ts,
-                    "first_trigger": ts,
-                    "count": 1,
-                }
+                    current_unlabeled = {
+                        "series_id": sid,
+                        "start": ts,
+                        "end": ts,
+                        "first_trigger": ts,
+                        "count": 1,
+                    }
         else:
-            if current_event:
-                events.append(
+            if current_unlabeled:
+                fallback_events.append(
                     PredictedEvent(
-                        series_id=current_event["series_id"],
-                        event_id=current_event["event_id"],
-                        start=current_event["start"],
-                        end=current_event["end"],
-                        first_trigger=current_event["first_trigger"],
-                        points_count=current_event["count"],
+                        series_id=current_unlabeled["series_id"],
+                        event_id="unlabeled",
+                        start=current_unlabeled["start"],
+                        end=current_unlabeled["end"],
+                        first_trigger=current_unlabeled["first_trigger"],
+                        points_count=current_unlabeled["count"],
                     )
                 )
-                current_event = None
+                current_unlabeled = None
 
-    if current_event:
-        events.append(
+    if current_unlabeled:
+        fallback_events.append(
             PredictedEvent(
-                series_id=current_event["series_id"],
-                event_id=current_event["event_id"],
-                start=current_event["start"],
-                end=current_event["end"],
-                first_trigger=current_event["first_trigger"],
-                points_count=current_event["count"],
+                series_id=current_unlabeled["series_id"],
+                event_id="unlabeled",
+                start=current_unlabeled["start"],
+                end=current_unlabeled["end"],
+                first_trigger=current_unlabeled["first_trigger"],
+                points_count=current_unlabeled["count"],
             )
         )
 
-    return events
+    all_events = [
+        PredictedEvent(
+            series_id=v["series_id"],
+            event_id=v["event_id"],
+            start=v["start"],
+            end=v["end"],
+            first_trigger=v["first_trigger"],
+            points_count=v["count"],
+        )
+        for v in events_by_id.values()
+    ]
+    all_events.extend(fallback_events)
+    return all_events
 
 
 def evaluate_event_f1(

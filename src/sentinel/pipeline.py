@@ -59,6 +59,7 @@ class SentinelPipeline:
         elif d_type in ("ensemble", "hybrid"):
             return HybridEnsembleDetector(
                 checkpoint_path="models/sentinel_tcn_best.pt",
+                scale_floor=cfg.detector.scale_floor,
             )
         else:
             raise ValueError(f"Unknown detector type: {d_type}")
