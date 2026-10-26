@@ -119,7 +119,9 @@ python scripts/run_sentinel.py --config configs/candidate.yaml --output-csv outp
 
 ### 5. Launch Interactive Replay Dashboard
 ```bash
-streamlit run app/dashboard.py
+python -m streamlit run app/dashboard.py
+# Or on Windows simply run:
+.\run_dashboard.bat
 ```
 
 ### 6. View Official 10-Slide Presentation Deck
