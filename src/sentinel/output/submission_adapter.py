@@ -6,6 +6,7 @@ import math
 import os
 from typing import Any, Sequence
 
+import numpy as np
 import pandas as pd
 
 from ..contracts import LABEL_ANOMALOUS, LABEL_NORMAL, PredictionRecord

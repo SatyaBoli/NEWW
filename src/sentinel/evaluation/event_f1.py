@@ -154,11 +154,12 @@ def evaluate_event_f1(
     delays_seconds: list[float] = []
     per_series_stats: dict[str, dict[str, float]] = {}
 
-    all_series_ids = set(gt_windows_by_series.keys()).union({p.series_id for p in predicted_events})
+    all_series_ids = set(str(k) for k in gt_windows_by_series.keys()).union({str(p.series_id) for p in predicted_events})
 
-    for sid in sorted(all_series_ids):
-        true_windows = gt_windows_by_series.get(sid, [])
-        pred_for_series = [p for p in predicted_events if p.series_id == sid]
+    for sid in sorted(all_series_ids, key=str):
+        sid_str = str(sid)
+        true_windows = gt_windows_by_series.get(sid_str, [])
+        pred_for_series = [p for p in predicted_events if str(p.series_id) == sid_str]
 
         matched_true = set()
         matched_pred = set()
