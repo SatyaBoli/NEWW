@@ -1,8 +1,8 @@
-# Sentinel Candidate Configuration (B3 / B4: Deep Causal TCN-Autoencoder + Adaptation)
+# Sentinel Candidate Configuration (B4: Deep Causal TCN-AE + Adaptive Ensemble)
 detector:
   detector_type: "ensemble"
   window_size: 60
-  scale_floor: 0.0001
+  scale_floor: 0.05
   ewma_alpha: 0.12
   iforest_n_estimators: 100
   ae_latent_dim: 16
@@ -12,14 +12,14 @@ detector:
   ae_device: "cuda"
 
 adaptation:
-  enter_threshold: 3.2
-  exit_threshold: 1.8
-  min_event_length: 1
-  cooldown_steps: 4
-  warmup_steps: 30
+  enter_threshold: 6.5
+  exit_threshold: 2.5
+  min_event_length: 3
+  cooldown_steps: 10
+  warmup_steps: 40
   regime_shift_patience: 40
   max_score: 1000000.0
-  detector_version: "sentinel-deep-0.1.0"
+  detector_version: "sentinel-deep-0.2.0"
   threshold_mode: "likelihood"
   likelihood_long_window: 600
   likelihood_short_window: 10

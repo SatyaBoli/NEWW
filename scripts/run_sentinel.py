@@ -32,6 +32,7 @@ def main():
     total_points = 0
 
     for sid in series_to_run:
+        pipeline.reset()
         stream = loader.stream_series(sid)
         records, stats = pipeline.process_stream(stream)
         all_records.extend(records)
@@ -50,7 +51,8 @@ def main():
     # Evaluate against ground truth
     if args.evaluate:
         gt_windows = loader.get_ground_truth_windows_by_series_id()
-        metrics = evaluate_event_f1(all_records, gt_windows)
+        eval_gt = {str(sid): gt_windows.get(str(sid), []) for sid in series_to_run}
+        metrics = evaluate_event_f1(all_records, eval_gt)
         print("\n=== Sentinel Evaluation Metrics ===")
         print(f"Event-Based F1 Score : {metrics.event_f1:.4f}")
         print(f"Event Precision       : {metrics.precision:.4f}")

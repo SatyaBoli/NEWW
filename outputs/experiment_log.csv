@@ -1,6 +1,6 @@
 experiment_id,model_name,detector_type,threshold_mode,event_f1,precision,recall,true_positives,false_positives,false_negatives,median_delay_sec,throughput_pts_sec,latency_ms_pt,total_points,elapsed_seconds
-E1_B0_MAD,Rolling Median + MAD,rolling_mad,robust_z,0.0154,0.008,0.1897,22,2713,94,38700.0,16872.3,0.059,58471,3.465
-E2_B1_EWMA,Streaming EWMA (alpha=0.15),ewma,robust_z,0.0131,0.0068,0.1897,22,3226,94,40800.0,35035.7,0.029,58471,1.669
-E3_B2_iForest,Causal Isolation Forest,iforest,robust_z,0.0633,0.0667,0.0603,7,98,109,52950.0,140.8,7.101,58471,415.178
-E4_B3_TCN_AE,Causal TCN-AE (CUDA),autoencoder,likelihood,0.0925,0.0788,0.1121,13,152,103,36750.0,1040.7,0.961,58471,56.186
-E5_B4_HybridEnsemble,Hybrid Ensemble + ADWIN Guard,ensemble,likelihood,0.0787,0.0635,0.1034,12,177,104,58500.0,998.5,1.001,58471,58.558
+E1_B0_MAD,Rolling Median + MAD,rolling_mad,robust_z,0.1111,0.1,0.125,1,9,7,60900.0,9553.7,0.105,23395,2.449
+E2_B1_EWMA,Streaming EWMA (alpha=0.15),ewma,robust_z,0.0833,0.0469,0.375,3,61,5,50100.0,38084.0,0.026,23395,0.614
+E3_B2_iForest,Causal Isolation Forest,iforest,robust_z,0.0,0.0,0.0,0,2,8,0.0,172.4,5.801,23395,135.72
+E4_B3_TCN_AE,Causal TCN-AE (CUDA),autoencoder,likelihood,0.1143,0.0741,0.25,2,25,6,35100.0,1269.1,0.788,23395,18.435
+E5_B4_HybridEnsemble,Hybrid Ensemble + ADWIN Guard,ensemble,likelihood,0.2857,0.3333,0.25,2,4,6,45900.0,1099.5,0.91,23395,21.278
