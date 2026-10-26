@@ -21,14 +21,16 @@ class HybridEnsembleDetector(BaseDetector):
         self,
         checkpoint_path: Optional[str] = "models/sentinel_tcn_best.pt",
         weights: tuple[float, float, float] = (0.45, 0.25, 0.30),  # (MAD, EWMA, TCN-AE)
-        version: str = "ensemble-0.1.0",
+        scale_floor: float = 0.05,
+        version: str = "ensemble-0.2.0",
     ) -> None:
         self.weights = weights
         self._version = version
+        self.scale_floor = scale_floor
 
-        self.mad_detector = RollingMedianMADDetector(window_size=50, warmup_steps=30)
-        self.ewma_detector = EWMADetector(alpha=0.15, warmup_steps=30)
-        self.tcn_detector = CausalTCNAEDetector(window_size=32, warmup_steps=25)
+        self.mad_detector = RollingMedianMADDetector(window_size=50, warmup_steps=30, scale_floor=scale_floor)
+        self.ewma_detector = EWMADetector(alpha=0.15, warmup_steps=30, scale_floor=scale_floor)
+        self.tcn_detector = CausalTCNAEDetector(window_size=32, warmup_steps=25, scale_floor=scale_floor)
 
         # Load trained weights if checkpoint exists
         if checkpoint_path:
