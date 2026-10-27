@@ -1,0 +1,183 @@
+{
+  "project": "Sentinel — Adaptive Time-Series Anomaly Detection",
+  "hackathon": "Utkrishta 2026 — Challenge 2",
+  "models": {
+    "Model_A_TCN_Global": {
+      "name": "Model A (Global TCN-AE)",
+      "checkpoint": "models/sentinel_tcn_best.pt",
+      "event_f1": 0.1,
+      "precision": 0.0833,
+      "recall": 0.125,
+      "true_positives": 1,
+      "false_positives": 11,
+      "throughput_pts_sec": 605.1,
+      "latency_ms_pt": 1.653
+    },
+    "Model_B_TCN_Specialist": {
+      "name": "Model B (Infra Specialist TCN)",
+      "checkpoint": "models/sentinel_specialist_best.pt",
+      "event_f1": 0.0,
+      "precision": 0.0,
+      "recall": 0.0,
+      "true_positives": 0,
+      "false_positives": 9,
+      "throughput_pts_sec": 706.9,
+      "latency_ms_pt": 1.415
+    },
+    "Model_A_Hybrid_Ensemble": {
+      "name": "Ensemble with Model A (Global)",
+      "checkpoint": "models/sentinel_tcn_best.pt",
+      "event_f1": 0.3077,
+      "precision": 0.4,
+      "recall": 0.25,
+      "true_positives": 2,
+      "false_positives": 3,
+      "throughput_pts_sec": 474.5,
+      "latency_ms_pt": 2.107
+    },
+    "Model_B_Hybrid_Ensemble": {
+      "name": "Ensemble with Model B (Specialist)",
+      "checkpoint": "models/sentinel_specialist_best.pt",
+      "event_f1": 0.1176,
+      "precision": 0.1111,
+      "recall": 0.125,
+      "true_positives": 1,
+      "false_positives": 8,
+      "throughput_pts_sec": 655.4,
+      "latency_ms_pt": 1.526
+    }
+  },
+  "experiments": [
+    {
+      "id": "E1_B0_MAD",
+      "name": "Rolling Median + MAD",
+      "detector": "rolling_mad",
+      "event_f1": 0.1333,
+      "precision": 0.0811,
+      "recall": 0.375,
+      "false_positives": 34,
+      "throughput": 3173.9,
+      "latency_ms": 0.315
+    },
+    {
+      "id": "E2_B1_EWMA",
+      "name": "Streaming EWMA (alpha=0.15)",
+      "detector": "ewma",
+      "event_f1": 0.0833,
+      "precision": 0.0469,
+      "recall": 0.375,
+      "false_positives": 61,
+      "throughput": 30351.6,
+      "latency_ms": 0.033
+    },
+    {
+      "id": "E3_B2_iForest",
+      "name": "Causal Isolation Forest",
+      "detector": "iforest",
+      "event_f1": 0.1818,
+      "precision": 0.3333,
+      "recall": 0.125,
+      "false_positives": 2,
+      "throughput": 271.3,
+      "latency_ms": 3.687
+    },
+    {
+      "id": "E3b_LOF",
+      "name": "Causal Local Outlier Factor",
+      "detector": "lof",
+      "event_f1": 0.1359,
+      "precision": 0.0737,
+      "recall": 0.875,
+      "false_positives": 88,
+      "throughput": 510.2,
+      "latency_ms": 1.96
+    },
+    {
+      "id": "E3c_OCSVM",
+      "name": "Causal One-Class SVM (RBF)",
+      "detector": "svm",
+      "event_f1": 0.16,
+      "precision": 0.0952,
+      "recall": 0.5,
+      "false_positives": 38,
+      "throughput": 769.6,
+      "latency_ms": 1.299
+    },
+    {
+      "id": "E4_B3_TCN_AE",
+      "name": "Causal TCN-AE (CUDA)",
+      "detector": "autoencoder",
+      "event_f1": 0.2105,
+      "precision": 0.1818,
+      "recall": 0.25,
+      "false_positives": 9,
+      "throughput": 767.8,
+      "latency_ms": 1.302
+    },
+    {
+      "id": "E5_B4_HybridEnsemble",
+      "name": "Hybrid Ensemble + ADWIN Guard",
+      "detector": "ensemble",
+      "event_f1": 0.375,
+      "precision": 0.375,
+      "recall": 0.375,
+      "false_positives": 5,
+      "throughput": 586.8,
+      "latency_ms": 1.704
+    }
+  ],
+  "ablations": [
+    {
+      "id": "A1_MAD_Only",
+      "name": "Rolling Median + MAD Alone",
+      "event_f1": 0.2069,
+      "precision": 0.1429,
+      "recall": 0.375,
+      "false_positives": 18
+    },
+    {
+      "id": "A2_EWMA_Only",
+      "name": "Streaming EWMA Alone",
+      "event_f1": 0.1905,
+      "precision": 0.1538,
+      "recall": 0.25,
+      "false_positives": 11
+    },
+    {
+      "id": "A3_TCN_AE_Only",
+      "name": "Causal TCN-AE Alone (RTX 5050)",
+      "event_f1": 0.0952,
+      "precision": 0.0769,
+      "recall": 0.125,
+      "false_positives": 12
+    },
+    {
+      "id": "A4_Statistical_Ensemble",
+      "name": "Statistical Ensemble (MAD + EWMA, No Deep AE)",
+      "event_f1": 0.2609,
+      "precision": 0.2,
+      "recall": 0.375,
+      "false_positives": 12
+    },
+    {
+      "id": "A5_Full_Hybrid_Ensemble",
+      "name": "Full Sentinel Hybrid Ensemble (Deep + Statistical + ADWIN)",
+      "event_f1": 0.375,
+      "precision": 0.375,
+      "recall": 0.375,
+      "false_positives": 5
+    }
+  ],
+  "evaluation": {
+    "event_f1": 0.375,
+    "precision": 0.375,
+    "recall": 0.375,
+    "true_positives": 3,
+    "false_positives": 5,
+    "false_negatives": 5,
+    "total_true_events": 8,
+    "total_predicted_events": 8,
+    "mean_detection_delay_seconds": 36300.0,
+    "median_detection_delay_seconds": 30600.0
+  }
+}

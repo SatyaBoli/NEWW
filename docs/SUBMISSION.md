@@ -62,6 +62,7 @@ Benchmark results across representative multi-domain test streams (23,395 observ
   - PowerPoint Deck: `docs/Sentinel_Presentation_Deck.pptx` (complete 10-slide deck with embedded telemetry figures)
   - Markdown Slide Deck: `docs/presentation_deck.md`
 - **Interactive Streamlit Dashboard**: `app/dashboard.py` (accessible at `http://localhost:8501` or via `run_dashboard.bat`).
+- **Interactive Web Dashboard (HTML)**: `app/index.html` (zero-dependency, 58-series NAB visualization with live streaming, model lab, and corpus browser — served via `python app/serve.py` at `http://localhost:8080`).
 
 ---
 
@@ -87,4 +88,11 @@ python scripts/run_sentinel.py --config configs/candidate.yaml --output-csv outp
 python -m streamlit run app/dashboard.py
 # Or on Windows:
 .\run_dashboard.bat
+```
+
+#### 5. Launch Web Dashboard (Zero Dependencies):
+```bash
+python app/serve.py
+# Or on Windows:
+.\run_web_dashboard.bat
 ```

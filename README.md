@@ -161,6 +161,20 @@ Visit `http://localhost:8501` to view:
 - **Tab 3: Architecture Guarantees**: Formal proof notes for causality and anti-contamination.
 - **Tab 4: Sentinel 2.0 Pathway**: Live interactive demos of Conformal Risk Control, Feedback Bank, and Periodicity Discovery.
 
+### 2b. Launch Web Dashboard (HTML — No Dependencies!)
+```bash
+# Zero-dependency HTML dashboard with full 58-series NAB visualization:
+python app/serve.py
+# Or on Windows:
+.\run_web_dashboard.bat
+```
+Visit `http://localhost:8080` for the interactive web dashboard featuring:
+- **Overview**: KPI cards with animated counters, model comparison bar charts
+- **Live Stream**: Real-time streaming replay with signal, anomaly score, adaptive threshold, and true anomaly window overlays
+- **Anomalies**: Filterable alert inspector with contextual mini-charts and evidence cards
+- **Model Lab**: Interactive F1-vs-threshold sweep curves across all 4 detector variants
+- **Corpus**: Full NAB corpus browser with per-series stats and one-click streaming replay
+
 ### 3. Run Benchmark Bake-Off
 ```bash
 # Compare Model A vs. Model B:
@@ -192,7 +206,9 @@ python scripts/run_sentinel.py --config configs/candidate.yaml --output-csv outp
 ```
 NEWW/
 ├── app/
-│   └── dashboard.py                  # Streamlit interactive replay dashboard (Tabs 1-4)
+│   ├── dashboard.py                  # Streamlit interactive replay dashboard (Tabs 1-4)
+│   ├── index.html                    # Interactive HTML dashboard (58 NAB series, zero-dependency)
+│   └── serve.py                      # Lightweight HTTP server for HTML dashboard
 ├── configs/
 │   ├── baseline.yaml                 # Fast statistical baseline config
 │   └── candidate.yaml                # Hybrid Deep Ensemble config
@@ -225,6 +241,7 @@ NEWW/
 │   ├── pipeline.py                   # Single causal streaming entry point
 │   └── train.py                      # PyTorch CUDA training engine
 ├── tests/                            # 17 unit & integration tests (100% passing)
+├── run_web_dashboard.bat              # Launch HTML dashboard on Windows
 ├── pyproject.toml                    # Package configuration
 └── README.md                         # Complete system documentation
 ```
