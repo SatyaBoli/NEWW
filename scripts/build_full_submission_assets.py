@@ -55,15 +55,16 @@ def generate_figures():
     plt.close(fig)
 
     # 3. Benchmark Scorecard Chart
-    fig, ax = plt.subplots(figsize=(8, 4))
-    b_names = ["Rolling MAD", "EWMA", "iForest", "Causal TCN-AE", "Sentinel Ensemble"]
-    f1_scores = [0.1333, 0.0833, 0.1818, 0.2105, 0.3750]
-    bars = ax.bar(b_names, f1_scores, color=["#64748b", "#94a3b8", "#cbd5e1", "#38bdf8", "#2563eb"], width=0.55)
+    fig, ax = plt.subplots(figsize=(9, 4))
+    b_names = ["Rolling MAD", "EWMA", "iForest", "LOF", "One-Class SVM", "Causal TCN-AE", "Sentinel Ensemble"]
+    f1_scores = [0.1333, 0.0833, 0.1818, 0.1359, 0.1600, 0.2105, 0.3750]
+    bars = ax.bar(b_names, f1_scores, color=["#64748b", "#94a3b8", "#cbd5e1", "#a78bfa", "#f472b6", "#38bdf8", "#2563eb"], width=0.58)
     ax.set_ylabel("Event-Based F1 Score", fontsize=11, fontweight="bold")
     ax.set_title("Utkrishta 2026 Primary Evaluation Metric (Event-F1)", fontsize=12, fontweight="bold")
+    plt.xticks(rotation=15, ha="right", fontsize=9)
     for bar in bars:
         yval = bar.get_height()
-        ax.text(bar.get_x() + bar.get_width() / 2, yval + 0.012, f"{yval:.4f}", ha="center", va="bottom", fontweight="bold")
+        ax.text(bar.get_x() + bar.get_width() / 2, yval + 0.010, f"{yval:.4f}", ha="center", va="bottom", fontweight="bold", fontsize=9)
     ax.set_ylim(0, 0.45)
     plt.tight_layout()
     fig.savefig("docs/figures/scorecard_chart.png", dpi=200)
@@ -179,6 +180,7 @@ def create_presentation_deck():
     bullets2 = [
         ("Strict Causality (No Lookahead Bias):", " In production operations, decisions at step t can only depend on past history x_{<t}. Batch algorithms (Isolation Forest, seasonal decomposition) leak future context."),
         ("Baseline Contamination Attack:", " When an infrastructure failure begins, anomalous values enter rolling statistics (mean, variance). Within minutes, the baseline distorts and normalizes the anomaly!"),
+        ("Challenge 2 Permitted Approaches:", " Fully implements and compares all required baselines: Rolling z-score/MAD, EWMA, Isolation Forests, Local Outlier Factor (LOF), One-Class SVMs, Causal TCN-AE, and Adaptive Hybrid Ensembles."),
         ("Alert Flapping & Noise:", " Single-threshold systems oscillate at the decision boundary, bombarding SRE teams with hundreds of fragmented alarms for a single incident."),
         ("Concept Drift vs. Incidents:", " True operational shifts (e.g., scheduled diurnal traffic growth or VM resizing) must be learned without confusing them with acute incidents."),
         ("Hardware Latency Constraints:", " Telemetry arrives at 1,000+ points/second. Detection algorithms must execute in sub-millisecond time.")

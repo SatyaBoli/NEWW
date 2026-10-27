@@ -64,12 +64,16 @@ class AdaptationConfig:
 class DetectorConfig:
     """Configuration for specific detectors (B0, B1, B2, B3, Ensemble)."""
 
-    detector_type: str = "rolling_mad"  # "rolling_mad" | "ewma" | "iforest" | "autoencoder" | "ensemble"
+    detector_type: str = "rolling_mad"  # "rolling_mad" | "ewma" | "iforest" | "lof" | "one_class_svm" | "autoencoder" | "ensemble"
     window_size: int = 50
     scale_floor: float = 1e-4
     ewma_alpha: float = 0.15
     iforest_n_estimators: int = 100
     iforest_contamination: float = 0.02
+    lof_n_neighbors: int = 20
+    lof_contamination: float = 0.02
+    svm_nu: float = 0.05
+    svm_kernel: str = "rbf"
     ae_latent_dim: int = 8
     ae_epochs: int = 25
     ae_batch_size: int = 64

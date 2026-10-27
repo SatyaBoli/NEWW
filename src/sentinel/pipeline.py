@@ -18,6 +18,8 @@ from .detectors import (
     HybridEnsembleDetector,
     RollingMedianMADDetector,
     StreamingIsolationForestDetector,
+    StreamingLOFDetector,
+    StreamingOneClassSVMDetector,
 )
 
 
@@ -53,6 +55,22 @@ class SentinelPipeline:
                 window_size=cfg.detector.window_size,
                 n_estimators=cfg.detector.iforest_n_estimators,
                 contamination=cfg.detector.iforest_contamination,
+            )
+        elif d_type in ("lof", "local_outlier_factor"):
+            return StreamingLOFDetector(
+                window_size=cfg.detector.window_size,
+                warmup_steps=cfg.adaptation.warmup_steps,
+                n_neighbors=cfg.detector.lof_n_neighbors,
+                contamination=cfg.detector.lof_contamination,
+                scale_floor=cfg.detector.scale_floor,
+            )
+        elif d_type in ("svm", "ocsvm", "one_class_svm"):
+            return StreamingOneClassSVMDetector(
+                window_size=cfg.detector.window_size,
+                warmup_steps=cfg.adaptation.warmup_steps,
+                nu=cfg.detector.svm_nu,
+                kernel=cfg.detector.svm_kernel,
+                scale_floor=cfg.detector.scale_floor,
             )
         elif d_type in ("autoencoder", "tcn", "tcn_ae"):
             chk = cfg.detector.checkpoint_path

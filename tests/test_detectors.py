@@ -7,6 +7,9 @@ import pytest
 
 from sentinel.contracts import Point
 from sentinel.detectors.ewma import EWMADetector
+from sentinel.detectors.isolation_forest import StreamingIsolationForestDetector
+from sentinel.detectors.lof import StreamingLOFDetector
+from sentinel.detectors.one_class_svm import StreamingOneClassSVMDetector
 from sentinel.detectors.rolling_mad import RollingMedianMADDetector
 
 
@@ -95,3 +98,57 @@ def test_interleaved_series_isolation():
         det_inter.update_state(pb, is_anomalous=False)
 
     assert np.allclose(scores_a_seq, scores_a_inter)
+
+
+def test_iforest_causality_and_detection():
+    """StreamingIsolationForestDetector must be causal and detect large departures."""
+    det = StreamingIsolationForestDetector(window_size=30, n_estimators=20)
+    series = [10.0 + (i % 3) * 0.5 for i in range(35)]
+    scores = []
+    for i, v in enumerate(series):
+        p = Point("s_iforest", f"2026-01-01T00:{i:02d}:00", v)
+        out = det.score_one(p)
+        det.update_state(p, is_anomalous=False)
+        scores.append(out.raw_score)
+        assert math.isfinite(out.raw_score)
+
+    spike = Point("s_iforest", "2026-01-01T00:36:00", 250.0)
+    out_spike = det.score_one(spike)
+    assert math.isfinite(out_spike.raw_score)
+    assert out_spike.raw_score > scores[-1]
+
+
+def test_lof_causality_and_detection():
+    """StreamingLOFDetector must maintain causality and detect local density deviations."""
+    det = StreamingLOFDetector(window_size=40, warmup_steps=15, n_neighbors=10)
+    series = [20.0 + math.sin(i * 0.2) for i in range(40)]
+    scores = []
+    for i, v in enumerate(series):
+        p = Point("s_lof", f"2026-01-01T00:{i:02d}:00", v)
+        out = det.score_one(p)
+        det.update_state(p, is_anomalous=False)
+        scores.append(out.raw_score)
+        assert math.isfinite(out.raw_score)
+
+    spike = Point("s_lof", "2026-01-01T00:41:00", 300.0)
+    out_spike = det.score_one(spike)
+    assert math.isfinite(out_spike.raw_score)
+    assert out_spike.raw_score > 2.0
+
+
+def test_one_class_svm_causality_and_detection():
+    """StreamingOneClassSVMDetector must be causal and flag RKHS boundary violations."""
+    det = StreamingOneClassSVMDetector(window_size=40, warmup_steps=15, nu=0.05)
+    series = [50.0 + (i % 4) for i in range(40)]
+    scores = []
+    for i, v in enumerate(series):
+        p = Point("s_svm", f"2026-01-01T00:{i:02d}:00", v)
+        out = det.score_one(p)
+        det.update_state(p, is_anomalous=False)
+        scores.append(out.raw_score)
+        assert math.isfinite(out.raw_score)
+
+    spike = Point("s_svm", "2026-01-01T00:41:00", 500.0)
+    out_spike = det.score_one(spike)
+    assert math.isfinite(out_spike.raw_score)
+    assert out_spike.raw_score > 2.0

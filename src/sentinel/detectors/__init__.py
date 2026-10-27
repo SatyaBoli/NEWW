@@ -2,6 +2,8 @@
 from .base import BaseDetector
 from .ewma import EWMADetector
 from .isolation_forest import StreamingIsolationForestDetector
+from .lof import StreamingLOFDetector
+from .one_class_svm import StreamingOneClassSVMDetector
 from .rolling_mad import RollingMedianMADDetector
 
 try:
@@ -33,5 +35,7 @@ __all__ = [
     "HybridEnsembleDetector",
     "RollingMedianMADDetector",
     "StreamingIsolationForestDetector",
+    "StreamingLOFDetector",
+    "StreamingOneClassSVMDetector",
     "TCNAEModule",
 ]

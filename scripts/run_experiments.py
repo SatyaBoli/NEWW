@@ -62,6 +62,28 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
             "cooldown_steps": 8,
         },
         {
+            "exp_id": "E3b_LOF",
+            "name": "Causal Local Outlier Factor",
+            "detector_type": "lof",
+            "threshold_mode": "robust_z",
+            "enter_threshold": 3.8,
+            "exit_threshold": 1.8,
+            "drift_enabled": False,
+            "min_event_length": 2,
+            "cooldown_steps": 8,
+        },
+        {
+            "exp_id": "E3c_OCSVM",
+            "name": "Causal One-Class SVM (RBF)",
+            "detector_type": "svm",
+            "threshold_mode": "robust_z",
+            "enter_threshold": 3.5,
+            "exit_threshold": 1.8,
+            "drift_enabled": False,
+            "min_event_length": 2,
+            "cooldown_steps": 8,
+        },
+        {
             "exp_id": "E4_B3_TCN_AE",
             "name": "Causal TCN-AE (CUDA)",
             "detector_type": "autoencoder",
@@ -102,6 +124,8 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
             window_size=exp.get("window_size", 50),
             ewma_alpha=exp.get("ewma_alpha", 0.15),
             iforest_n_estimators=exp.get("iforest_n_estimators", 30),
+            lof_n_neighbors=exp.get("lof_n_neighbors", 20),
+            svm_nu=exp.get("svm_nu", 0.05),
         )
         adapt_cfg = AdaptationConfig(
             enter_threshold=exp["enter_threshold"],

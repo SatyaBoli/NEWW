@@ -178,6 +178,86 @@ st.markdown(
         box-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
         color: #E2C275;
     }
+
+    /* Flagged Incident Cards & Deep Inspector */
+    .pill-critical {
+        background: rgba(239, 68, 68, 0.18);
+        color: #F87171;
+        border: 1px solid rgba(239, 68, 68, 0.4);
+        border-radius: 10px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+    .pill-high {
+        background: rgba(249, 115, 22, 0.18);
+        color: #FB923C;
+        border: 1px solid rgba(249, 115, 22, 0.4);
+        border-radius: 10px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+    .pill-medium {
+        background: rgba(234, 179, 8, 0.18);
+        color: #FACC15;
+        border: 1px solid rgba(234, 179, 8, 0.4);
+        border-radius: 10px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+    .pill-tp {
+        background: rgba(34, 197, 94, 0.18);
+        color: #4ADE80;
+        border: 1px solid rgba(34, 197, 94, 0.4);
+        border-radius: 10px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+    .pill-fp {
+        background: rgba(245, 158, 11, 0.18);
+        color: #FBBF24;
+        border: 1px solid rgba(245, 158, 11, 0.4);
+        border-radius: 10px;
+        padding: 2px 7px;
+        font-size: 0.68rem;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+    }
+    .inspector-card {
+        background: #111319;
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        border-radius: 8px;
+        padding: 18px 20px;
+    }
+    .narrative-box {
+        background: #0D0F14;
+        border-left: 3px solid #D4AF37;
+        border-radius: 4px;
+        padding: 12px 16px;
+        margin: 12px 0;
+        font-size: 0.88rem;
+        line-height: 1.5;
+        color: #E2E8F0;
+    }
+    .quarantine-tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(59, 130, 246, 0.12);
+        color: #60A5FA;
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 6px;
+        padding: 4px 10px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -220,10 +300,11 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-tab_stream, tab_scorecard, tab_pathway, tab_architecture = st.tabs(
+tab_stream, tab_scorecard, tab_corpus, tab_pathway, tab_architecture = st.tabs(
     [
         "Live Oscilloscope Stream",
         "Benchmark & Ablation Scorecard",
+        "NAB Corpus Explorer (58 Datasets)",
         "Sentinel 2.0 Innovations",
         "Causality Guarantees",
     ]
@@ -273,6 +354,8 @@ with tab_stream:
                 "Rolling Median + MAD Baseline (B0)",
                 "Streaming EWMA Baseline (B1)",
                 "Causal Isolation Forest Baseline (B2)",
+                "Causal Local Outlier Factor Baseline (B3 - Permitted)",
+                "Causal One-Class SVM Baseline (B4 - Permitted)",
             ],
             index=0,
             label_visibility="collapsed",
@@ -288,6 +371,19 @@ with tab_stream:
 
     with ctrl_col5:
         run_stream = st.button("▶ Stream", use_container_width=True)
+
+    # Secondary options bar: Ground-truth window overlay toggle & visual legend
+    opt_col1, opt_col2 = st.columns([2.4, 7.6])
+    with opt_col1:
+        show_gt_windows = st.checkbox("Show Ground-Truth Windows", value=True)
+    with opt_col2:
+        st.markdown(
+            "<div style='font-size:0.8rem;color:#94A3B8;padding-top:4px;'>"
+            "🟢 <span style='color:#4ADE80;font-weight:600;'>Ground-Truth Anomaly Windows</span> shaded in translucent emerald · "
+            "🔴 <span style='color:#FF5C5C;font-weight:600;'>Causal Detections</span> highlighted with crimson points"
+            "</div>",
+            unsafe_allow_html=True,
+        )
 
     # Placeholders for Dynamic Real-Time Updates
     kpi_placeholder = st.empty()
@@ -333,6 +429,8 @@ with tab_stream:
     all_stream_pts = list(loader.stream_series(selected_sid))
     total_pts = len(all_stream_pts)
 
+    sid_gt_windows = gt_windows.get(str(selected_sid), [])
+
     def build_visual_chart(df_data: pd.DataFrame, height: int = 340) -> alt.VConcatChart:
         # Time-Series Layer
         base = alt.Chart(df_data).encode(
@@ -358,8 +456,20 @@ with tab_stream:
                 tooltip=["timestamp:T", "observed:Q", "score:Q", "event_id:N"],
             )
         )
-        # Note: Do NOT set background on individual layers inside vconcat (Altair requirement)
-        ts_chart = alt.layer(line_obs, line_base, points_anom).properties(height=height)
+        layers = [line_obs, line_base, points_anom]
+
+        # Ground-Truth Window Shading (Translucent Emerald Band)
+        if show_gt_windows and sid_gt_windows:
+            gt_records = [{"start": w[0], "end": w[1]} for w in sid_gt_windows if len(w) == 2]
+            if gt_records:
+                gt_df = pd.DataFrame(gt_records)
+                gt_rect = alt.Chart(gt_df).mark_rect(color="#22C55E", opacity=0.18).encode(
+                    x=alt.X("start:T"),
+                    x2=alt.X2("end:T"),
+                )
+                layers.insert(0, gt_rect)
+
+        ts_chart = alt.layer(*layers).properties(height=height)
 
         # Lower Score & Threshold Strip
         line_score = base.mark_line(color="#D4AF37", strokeWidth=1.2).encode(
@@ -373,7 +483,16 @@ with tab_stream:
         line_thresh = base.mark_line(color="#EF4444", strokeDash=[2, 2], strokeWidth=1.0).encode(
             y="threshold:Q"
         )
-        score_chart = alt.layer(line_score, line_thresh).properties(height=90)
+        score_layers = [line_score, line_thresh]
+
+        if show_gt_windows and sid_gt_windows and gt_records:
+            gt_rect_lower = alt.Chart(gt_df).mark_rect(color="#22C55E", opacity=0.10).encode(
+                x=alt.X("start:T"),
+                x2=alt.X2("end:T"),
+            )
+            score_layers.insert(0, gt_rect_lower)
+
+        score_chart = alt.layer(*score_layers).properties(height=90)
 
         # Top-level VConcatChart owns the background attribute
         return alt.vconcat(ts_chart, score_chart).properties(background="transparent").configure_view(strokeWidth=0)
@@ -453,6 +572,12 @@ with tab_stream:
         elif "Isolation Forest" in model_choice:
             det_cfg = DetectorConfig(detector_type="iforest", iforest_n_estimators=30, scale_floor=0.05)
             pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+        elif "Local Outlier Factor" in model_choice:
+            det_cfg = DetectorConfig(detector_type="lof", lof_n_neighbors=20, scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+        elif "One-Class SVM" in model_choice:
+            det_cfg = DetectorConfig(detector_type="svm", svm_nu=0.05, scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
         else:
             pipeline = SentinelPipeline.from_yaml("configs/candidate.yaml")
 
@@ -518,32 +643,140 @@ with tab_stream:
         final_df = pd.DataFrame(plot_buffer)
         chart_placeholder.altair_chart(build_visual_chart(final_df, height=360), use_container_width=True)
 
-        # Incident Audit Trail
+        # Incident Audit Trail & Deep Root-Cause Inspector
         if unique_events:
             st.markdown(
                 f"""
-            <div style="margin-top:20px;margin-bottom:8px;font-size:0.8rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#E2C275;">
-                CONFIRMED INCIDENT LOG ({len(unique_events)} Flagged Windows)
+            <div style="margin-top:24px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid rgba(212,175,55,0.2);padding-bottom:6px;">
+                <div style="font-size:0.85rem;letter-spacing:0.12em;font-weight:700;text-transform:uppercase;color:#E2C275;">
+                    INCIDENT AUDIT & DEEP ROOT-CAUSE INSPECTOR
+                </div>
+                <div style="font-size:0.75rem;color:#94A3B8;font-family:'JetBrains Mono';">
+                    {len(unique_events)} FLAGGED WINDOWS · ANTI-POLLUTION QUARANTINE ACTIVE
+                </div>
             </div>
             """,
                 unsafe_allow_html=True,
             )
 
-            table_rows = []
-            for eid, r in unique_events.items():
-                expl = generate_explanation(r)
-                table_rows.append(
-                    {
-                        "Incident ID": eid,
-                        "Timestamp": r["timestamp"],
-                        "Observed": f"{expl['observed_value']:.2f}",
-                        "Expected Baseline": f"{expl['expected_baseline']:.2f}",
-                        "Residual Delta": f"{expl['residual']:+.2f} ({expl['percent_deviation']:+.1f}%)",
-                        "Score": f"{r['anomaly_score']:.2f}",
-                        "Trigger Reason": ", ".join(expl["reason_codes"]),
-                    }
+            col_list, col_inspect = st.columns([1.1, 1.9])
+
+            def check_is_tp(event_rec: dict, windows: list[list[str]]) -> bool:
+                ts = str(event_rec.get("timestamp", ""))
+                for w in windows:
+                    if len(w) == 2 and w[0] <= ts <= w[1]:
+                        return True
+                return False
+
+            event_id_list = list(unique_events.keys())
+            with col_list:
+                st.markdown("<div style='font-size:0.75rem;font-weight:600;color:#94A3B8;text-transform:uppercase;margin-bottom:8px;'>Flagged Incidents</div>", unsafe_allow_html=True)
+                selected_eid = st.selectbox(
+                    "Select Incident",
+                    options=event_id_list,
+                    format_func=lambda eid: f"[{eid}] {unique_events[eid]['timestamp']} (Score: {unique_events[eid]['anomaly_score']:.1f})",
+                    label_visibility="collapsed",
                 )
-            incident_placeholder.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+
+                for eid in event_id_list:
+                    rec = unique_events[eid]
+                    is_tp = check_is_tp(rec, sid_gt_windows)
+                    score = rec["anomaly_score"]
+                    sev_class = "pill-critical" if score >= 8.0 else ("pill-high" if score >= 6.5 else ("pill-medium" if score >= 5.0 else "pill-high"))
+                    sev_label = "CRITICAL" if score >= 8.0 else ("HIGH" if score >= 6.5 else ("MEDIUM" if score >= 5.0 else "LOW"))
+                    status_class = "pill-tp" if is_tp else "pill-fp"
+                    status_label = "CONFIRMED TP" if is_tp else "FALSE ALARM"
+                    is_active_card = (eid == selected_eid)
+                    border_color = "rgba(212, 175, 55, 0.8)" if is_active_card else "rgba(255, 255, 255, 0.08)"
+                    bg_color = "rgba(212, 175, 55, 0.08)" if is_active_card else "#111319"
+
+                    st.markdown(
+                        f"""
+                    <div style="background:{bg_color};border:1px solid {border_color};border-radius:8px;padding:10px 14px;margin-bottom:8px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-family:'JetBrains Mono';font-size:0.8rem;font-weight:600;color:#F8FAFC;">{eid}</span>
+                            <div style="display:flex;gap:4px;">
+                                <span class="{sev_class}">{sev_label}</span>
+                                <span class="{status_class}">{status_label}</span>
+                            </div>
+                        </div>
+                        <div style="font-size:0.72rem;color:#94A3B8;font-family:'JetBrains Mono';">
+                            {rec['timestamp']}
+                        </div>
+                        <div style="display:flex;justify-content:space-between;font-size:0.75rem;margin-top:6px;color:#E2E8F0;">
+                            <span>Peak Score: <b style="color:#E2C275;">{score:.2f}</b></span>
+                            <span>Threshold: <span style="color:#EF4444;">{rec['threshold']:.2f}</span></span>
+                        </div>
+                    </div>
+                    """,
+                        unsafe_allow_html=True,
+                    )
+
+            with col_inspect:
+                target_rec = unique_events[selected_eid]
+                expl = generate_explanation(target_rec)
+                is_tp = check_is_tp(target_rec, sid_gt_windows)
+                status_html = '<span class="pill-tp" style="font-size:0.75rem;">CONFIRMED TP (In Ground-Truth Window)</span>' if is_tp else '<span class="pill-fp" style="font-size:0.75rem;">FALSE ALARM (Outside Ground-Truth)</span>'
+                obs = expl["observed_value"]
+                base = expl["expected_baseline"]
+                res = expl["residual"]
+                pct = expl["percent_deviation"]
+                score = target_rec["anomaly_score"]
+                thresh = target_rec["threshold"]
+                reasons_html = " ".join([f'<span style="background:rgba(212,175,55,0.12);color:#E2C275;border:1px solid rgba(212,175,55,0.3);border-radius:4px;padding:2px 6px;font-size:0.68rem;font-family:JetBrains Mono;">{rc}</span>' for rc in expl['reason_codes']])
+
+                st.markdown(
+                    f"""
+                <div class="inspector-card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid rgba(255,255,255,0.08);padding-bottom:10px;">
+                        <div>
+                            <div style="font-size:0.72rem;letter-spacing:0.1em;color:#94A3B8;text-transform:uppercase;">DEEP INSPECTION DOSSIER</div>
+                            <div style="font-size:1.15rem;font-weight:700;color:#F8FAFC;font-family:'JetBrains Mono';">{selected_eid} · {target_rec['timestamp']}</div>
+                        </div>
+                        <div>{status_html}</div>
+                    </div>
+
+                    <!-- 4 Compact Metrics -->
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;">
+                        <div style="background:#0D0F14;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.68rem;color:#94A3B8;text-transform:uppercase;">Observed Value</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#E2C275;font-family:'JetBrains Mono';">{obs:.2f}</div>
+                        </div>
+                        <div style="background:#0D0F14;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.68rem;color:#94A3B8;text-transform:uppercase;">Learned Baseline</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#94A3B8;font-family:'JetBrains Mono';">{base:.2f}</div>
+                        </div>
+                        <div style="background:#0D0F14;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.68rem;color:#94A3B8;text-transform:uppercase;">Residual Delta</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:{'#FF5C5C' if res > 0 else '#60A5FA'};font-family:'JetBrains Mono';">{res:+.2f} ({pct:+.1f}%)</div>
+                        </div>
+                        <div style="background:#0D0F14;padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.06);">
+                            <div style="font-size:0.68rem;color:#94A3B8;text-transform:uppercase;">Score / Threshold</div>
+                            <div style="font-size:1.1rem;font-weight:700;color:#F87171;font-family:'JetBrains Mono';">{score:.2f} <span style="font-size:0.75rem;color:#64748B;">/ {thresh:.2f}</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Plain-English Causal Narrative -->
+                    <div style="font-size:0.72rem;letter-spacing:0.08em;font-weight:600;color:#D4AF37;text-transform:uppercase;">Causal Root-Cause Narrative</div>
+                    <div class="narrative-box">
+                        At <b>{target_rec['timestamp']}</b>, observed telemetry spiked to <b>{obs:.2f}</b>, departing by <b>{pct:+.1f}%</b> from the normal learned baseline of <b>{base:.2f}</b>. 
+                        The calibrated composite anomaly score surged to <b>{score:.2f}</b>, breaking above the dynamic likelihood enter threshold of <b>{thresh:.2f}</b>.
+                    </div>
+
+                    <!-- Detector Attribution & Reason Codes -->
+                    <div style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;">
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <span style="font-size:0.72rem;color:#94A3B8;text-transform:uppercase;">Reason Codes:</span>
+                            {reasons_html}
+                        </div>
+                        <div class="quarantine-tag">
+                            🛡️ Anti-Contamination Quarantine Active
+                        </div>
+                    </div>
+                </div>
+                """,
+                    unsafe_allow_html=True,
+                )
         else:
             incident_placeholder.markdown(
                 '<div style="color:#64748B;font-size:0.85rem;padding:8px 0;">No anomaly incidents detected in stream segment. Baseline remained in clean operating regime.</div>',
@@ -578,6 +811,8 @@ with tab_scorecard:
                     "recall",
                     "true_positives",
                     "false_positives",
+                    "false_negatives",
+                    "median_delay_sec",
                     "throughput_pts_sec",
                     "latency_ms_pt",
                 ]
@@ -651,7 +886,78 @@ with tab_scorecard:
         )
 
 # =============================================================================
-# TAB 3: Sentinel 2.0 Innovations
+# TAB 3: NAB Benchmark Corpus Explorer (58 Datasets Across 7 Domains)
+# =============================================================================
+with tab_corpus:
+    st.markdown(
+        """
+    <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+        NUMENTA ANOMALY BENCHMARK (NAB) · COMPLETE DATA CORPUS
+    </div>
+    <div style="font-size:1.15rem;font-weight:600;color:#F8FAFC;margin-bottom:14px;">
+        58 Real-World & Artificial Streaming Datasets Across 7 Operational Domains
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
+
+    all_categories = sorted(list({s.category for s in series_list}))
+    cat_options = ["All Categories (58 Streams)"] + all_categories
+    selected_cat = st.selectbox("Filter Corpus by Domain Category", options=cat_options, index=0)
+
+    filtered_series = series_list if "All" in selected_cat else [s for s in series_list if s.category == selected_cat]
+
+    # Metric summary row
+    c1, c2, c3, c4 = st.columns(4)
+    with c1:
+        st.markdown(
+            f"""<div class="kpi-card"><div class="kpi-label">Corpus Streams</div><div class="kpi-value">{len(filtered_series)}</div><div class="kpi-sub">Active in Selection</div></div>""",
+            unsafe_allow_html=True,
+        )
+    with c2:
+        tot_pts = sum(s.num_rows for s in filtered_series)
+        st.markdown(
+            f"""<div class="kpi-card"><div class="kpi-label">Streaming Data Points</div><div class="kpi-value-gold">{tot_pts:,}</div><div class="kpi-sub">Strict Causal Order</div></div>""",
+            unsafe_allow_html=True,
+        )
+    with c3:
+        anom_series_count = sum(1 for s in filtered_series if s.has_anomaly)
+        st.markdown(
+            f"""<div class="kpi-card"><div class="kpi-label">Streams with Anomaly</div><div class="kpi-value">{anom_series_count} <span style="font-size:0.8rem;color:#94A3B8;">/ {len(filtered_series)}</span></div><div class="kpi-sub">Labeled by NAB Ground Truth</div></div>""",
+            unsafe_allow_html=True,
+        )
+    with c4:
+        tot_windows = sum(len(gt_windows.get(s.series_id, [])) for s in filtered_series)
+        st.markdown(
+            f"""<div class="kpi-card"><div class="kpi-label">Ground-Truth Windows</div><div class="kpi-value">{tot_windows}</div><div class="kpi-sub">Official Target Windows</div></div>""",
+            unsafe_allow_html=True,
+        )
+
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
+    # Detailed Interactive Table
+    table_data = []
+    for s in filtered_series:
+        w_count = len(gt_windows.get(s.series_id, []))
+        is_bench = "⭐ Official Benchmark" if s.series_id in BENCHMARK_SIDS else "Corpus Stream"
+        table_data.append(
+            {
+                "Series ID": s.series_id,
+                "Category": s.category,
+                "Stream Name": s.series_name,
+                "Data Points": s.num_rows,
+                "GT Windows": w_count,
+                "Has Anomaly": "YES" if s.has_anomaly else "NO",
+                "Benchmark Track": is_bench,
+                "Start Timestamp": s.start_time,
+                "End Timestamp": s.end_time,
+            }
+        )
+
+    st.dataframe(pd.DataFrame(table_data), use_container_width=True, hide_index=True)
+
+# =============================================================================
+# TAB 4: Sentinel 2.0 Innovations
 # =============================================================================
 with tab_pathway:
     st.markdown(
@@ -721,7 +1027,7 @@ with tab_pathway:
         )
 
 # =============================================================================
-# TAB 4: Causality Guarantees
+# TAB 5: Causality Guarantees
 # =============================================================================
 with tab_architecture:
     st.markdown(

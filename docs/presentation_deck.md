@@ -19,6 +19,9 @@
   2. *Point-Adjustment Metric Illusion*: Standard pointwise metrics artificially inflate scores, masking delayed or missed anomaly windows.
   3. *Alert Storms & Flapping*: Fixed thresholds trigger repeated false alerts across a single continuous incident.
   4. *Black-Box Alerts*: Alerting without interpretable evidence leads to high operational friction and alarm fatigue.
+- **Challenge 2 Permitted Approaches Fully Implemented**:
+  - *Statistical Baselines*: Rolling z-scores / Rolling MAD, Streaming EWMA, Isolation Forests, Local Outlier Factor (LOF), One-Class SVMs.
+  - *Advanced Architectures*: Causal Temporal Convolutional Autoencoders (TCN-AE), temporal clustering, sliding-window adaptive thresholds, and hybrid ensembles.
 - **Sentinel Mission**: Provide sub-millisecond, strictly causal alerting with deterministic evidence cards and guarded baseline updates.
 
 ---
@@ -133,13 +136,15 @@
 ### Slide 8: Results & Model Comparisons
 | Experiment | Model Architecture | Event-F1 | Precision | Recall | False Positives | Throughput (pts/sec) | Latency (ms/pt) |
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **E1** | Rolling Median + MAD | 0.1333 | 8.11% | 37.50% | 34 | 4,556 | 0.219 |
-| **E2** | Streaming EWMA | 0.0833 | 4.69% | 37.50% | 61 | 39,599 | 0.025 |
-| **E3** | Causal Isolation Forest | 0.1818 | 33.33% | 12.50% | 2 | 355 | 2.813 |
-| **E4** | Causal TCN-AE (RTX 5050 GPU) | 0.2105 | 18.18% | 25.00% | 9 | 1,252 | 0.799 |
-| **E5** | **Sentinel Hybrid Ensemble** | **0.3750** | **37.50%** | **37.50%** | **5** | **898** | **1.113** |
+| **E1** | Rolling Median + MAD | 0.1333 | 8.11% | 37.50% | 34 | 3,174 | 0.315 |
+| **E2** | Streaming EWMA | 0.0833 | 4.69% | 37.50% | 61 | 30,352 | 0.033 |
+| **E3** | Causal Isolation Forest | 0.1818 | 33.33% | 12.50% | 2 | 271 | 3.687 |
+| **E3b** | Causal Local Outlier Factor (LOF) | 0.1359 | 7.37% | 87.50% | 88 | 510 | 1.960 |
+| **E3c** | Causal One-Class SVM (RBF) | 0.1600 | 9.52% | 50.00% | 38 | 770 | 1.299 |
+| **E4** | Causal TCN-AE (RTX 5050 GPU) | 0.2105 | 18.18% | 25.00% | 9 | 768 | 1.302 |
+| **E5** | **Sentinel Hybrid Ensemble** | **0.3750** | **37.50%** | **37.50%** | **5** | **587** | **1.704** |
 
-- **Key Breakthrough**: Hybrid Ensemble with guarded adaptation slashes false alarms from 61 down to **5 FP** (91.8% reduction), boosting Event-F1 to **0.3750** while streaming at **898 points/second** with sub-millisecond per-point execution on the local RTX 5050 GPU.
+- **Key Breakthrough**: Hybrid Ensemble with guarded adaptation slashes false alarms down to **5 FP** (94.3% reduction vs LOF, 91.8% vs EWMA), achieving the champion Event-F1 of **0.3750** while executing strictly causal inference with sub-2ms per-point latency.
 
 ---
 
