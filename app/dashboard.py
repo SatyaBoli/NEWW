@@ -264,12 +264,21 @@ st.markdown(
 )
 
 
+def _get_master_data_path() -> str:
+    master_path = os.path.join("data", "raw", "NAB_AI_Training_Dataset.csv")
+    if os.path.exists(master_path):
+        return os.path.abspath(master_path)
+    return "data/raw/NAB_AI_Training_Dataset.csv"
+
+
 @st.cache_resource
-def load_data_engine():
-    return NABDataLoader()
+def load_data_engine(path: str, mtime: float):
+    return NABDataLoader(data_path=path)
 
 
-loader = load_data_engine()
+_path = _get_master_data_path()
+_mtime = os.path.getmtime(_path) if os.path.exists(_path) else 0.0
+loader = load_data_engine(_path, _mtime)
 series_list = loader.list_series()
 gt_windows = loader.get_ground_truth_windows_by_series_id()
 
@@ -340,21 +349,41 @@ with tab_stream:
         if "Evaluated Benchmark" in stream_subset:
             available_sids = [sid for sid in BENCHMARK_SIDS if sid in series_meta_dict]
         elif "realAWSCloudwatch" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "realAWSCloudwatch"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "realAWSCloudwatch"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "realKnownCause" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "realKnownCause"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "realKnownCause"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "realAdExchange" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "realAdExchange"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "realAdExchange"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "realTraffic" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "realTraffic"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "realTraffic"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "realTweets" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "realTweets"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "realTweets"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "artificialWithAnomaly" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "artificialWithAnomaly"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "artificialWithAnomaly"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         elif "artificialNoAnomaly" in stream_subset:
-            available_sids = [s.series_id for s in series_list if s.category == "artificialNoAnomaly"]
+            available_sids = sorted(
+                [s.series_id for s in series_list if s.category == "artificialNoAnomaly"],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
         else:
-            # All 58 series: benchmark first, then all others numerically sorted
             bench_part = [sid for sid in BENCHMARK_SIDS if sid in series_meta_dict]
             other_part = sorted(
                 [s.series_id for s in series_list if s.series_id not in BENCHMARK_SIDS],
@@ -365,7 +394,11 @@ with tab_stream:
         if not available_sids:
             available_sids = [s.series_id for s in series_list]
 
-        default_idx = available_sids.index("11") if "11" in available_sids else 0
+        default_idx = 0
+        if "11" in available_sids:
+            default_idx = available_sids.index("11")
+        elif "34" in available_sids:
+            default_idx = available_sids.index("34")
 
         selected_sid = st.selectbox(
             "Telemetry Stream",
@@ -373,6 +406,7 @@ with tab_stream:
             format_func=format_series_label,
             index=default_idx,
             label_visibility="collapsed",
+            key=f"series_selector_{stream_subset}",
         )
 
     with ctrl_col3:
