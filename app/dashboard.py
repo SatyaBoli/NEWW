@@ -2,7 +2,7 @@
 
 A minimal cognitive load, high-signal interface for streaming time-series anomaly detection.
 Styled in dark obsidian and champagne gold, emphasizing live telemetry progression,
-transparent evidence generation, and zero visual clutter.
+transparent evidence generation, zero visual clutter, and zero empty/dummy slots.
 """
 from __future__ import annotations
 
@@ -122,49 +122,55 @@ st.markdown(
         margin-top: 2px;
     }
 
-    /* Status Pills */
     .status-nominal {
         color: #4ADE80;
         font-weight: 600;
-        font-size: 0.82rem;
-        letter-spacing: 0.05em;
     }
     .status-alert {
         color: #FF5C5C;
         font-weight: 700;
-        font-size: 0.82rem;
-        letter-spacing: 0.05em;
+        animation: pulse 1.5s infinite;
     }
 
-    /* Clean Tabs */
+    @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+    }
+
+    /* Custom Streamlit Tabs Styling */
     .stTabs [data-baseweb="tab-list"] {
-        gap: 12px;
-        background-color: transparent;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        gap: 24px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         padding-bottom: 4px;
     }
     .stTabs [data-baseweb="tab"] {
-        padding: 8px 16px;
-        background-color: transparent;
-        border-radius: 6px;
-        color: #94A3B8;
+        background-color: transparent !important;
+        border: none !important;
+        color: #94A3B8 !important;
         font-weight: 500;
-        font-size: 0.88rem;
+        font-size: 0.9rem;
+        padding: 8px 12px;
     }
     .stTabs [aria-selected="true"] {
-        background-color: rgba(212, 175, 55, 0.12) !important;
         color: #E2C275 !important;
-        border: 1px solid rgba(212, 175, 55, 0.3) !important;
+        border-bottom: 2px solid #D4AF37 !important;
+        font-weight: 600;
     }
 
-    /* Buttons */
+    /* Inputs & Selectboxes */
+    .stSelectbox > div > div {
+        background-color: #111319 !important;
+        color: #F8FAFC !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-radius: 6px !important;
+    }
     .stButton button {
-        background: linear-gradient(180deg, #1A1D26 0%, #111319 100%);
+        background: linear-gradient(135deg, #1A1D26 0%, #111319 100%);
         color: #F8FAFC;
         border: 1px solid rgba(212, 175, 55, 0.4);
         border-radius: 6px;
-        font-weight: 500;
-        font-size: 0.88rem;
+        font-weight: 600;
+        letter-spacing: 0.05em;
         transition: all 0.2s ease;
     }
     .stButton button:hover {
@@ -187,14 +193,19 @@ loader = load_data_engine()
 series_list = loader.list_series()
 gt_windows = loader.get_ground_truth_windows_by_series_id()
 
-# Friendly series names mapping
-friendly_names = {
-    "11": "AWS EC2 CPU Utilization (realAWSCloudwatch)",
-    "13": "AWS EC2 CPU 5f5533 (realAWSCloudwatch)",
-    "5": "Art Daily Flat Middle (artificialNoAnomaly)",
-    "7": "Art Daily Jumps Up (artificialWithAnomaly)",
-    "34": "Ambient Temperature Sensor (realKnownCause)",
-}
+# Benchmark primary series IDs
+BENCHMARK_SIDS = ["11", "13", "34", "5", "7"]
+series_meta_dict = {s.series_id: s for s in series_list}
+
+def format_series_label(sid: str) -> str:
+    meta = series_meta_dict.get(sid)
+    if not meta:
+        return f"Series {sid}"
+    clean_name = meta.series_name.replace("_", " ").title()
+    if sid in BENCHMARK_SIDS:
+        return f"⭐ [{sid}] {clean_name} ({meta.category}) · Benchmark"
+    return f"[{sid}] {clean_name} ({meta.category})"
+
 
 # -----------------------------------------------------------------------------
 # Top Navigation & Command Header
@@ -212,7 +223,7 @@ st.markdown(
 tab_stream, tab_scorecard, tab_pathway, tab_architecture = st.tabs(
     [
         "Live Oscilloscope Stream",
-        "Benchmark Scorecard",
+        "Benchmark & Ablation Scorecard",
         "Sentinel 2.0 Innovations",
         "Causality Guarantees",
     ]
@@ -222,34 +233,52 @@ tab_stream, tab_scorecard, tab_pathway, tab_architecture = st.tabs(
 # TAB 1: Live Oscilloscope Stream
 # =============================================================================
 with tab_stream:
-    # Minimalist Control Strip (Horizontal, No Sidebar Cramming)
-    ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns([2.5, 2.5, 1.8, 1.2])
+    # Minimalist Control Strip (Clean 5-column layout)
+    ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4, ctrl_col5 = st.columns([1.6, 2.6, 2.4, 1.8, 1.2])
 
     with ctrl_col1:
-        sid_options = [s.series_id for s in series_list]
-        selected_sid = st.selectbox(
-            "Telemetry Stream",
-            options=sid_options,
-            format_func=lambda s: f"[{s}] {friendly_names.get(s, s)}",
-            index=sid_options.index("11") if "11" in sid_options else 0,
+        stream_subset = st.selectbox(
+            "Stream Subset",
+            options=["Evaluated Benchmark (5)", "All Streams (Full Corpus)"],
+            index=0,
             label_visibility="collapsed",
         )
 
     with ctrl_col2:
+        if stream_subset == "Evaluated Benchmark (5)":
+            available_sids = [sid for sid in BENCHMARK_SIDS if sid in series_meta_dict]
+            # Fallback if benchmark series not populated
+            if not available_sids:
+                available_sids = [s.series_id for s in series_list[:5]]
+        else:
+            available_sids = [s.series_id for s in series_list]
+
+        selected_sid = st.selectbox(
+            "Telemetry Stream",
+            options=available_sids,
+            format_func=format_series_label,
+            index=available_sids.index("11") if "11" in available_sids else 0,
+            label_visibility="collapsed",
+        )
+
+    with ctrl_col3:
         model_choice = st.selectbox(
             "Detector Architecture",
             options=[
-                "Model B: Infrastructure Specialist (Ensemble)",
-                "Model A: Global Generalist (Ensemble)",
-                "Model B: Standalone TCN-AE (CUDA)",
-                "Model A: Standalone TCN-AE (CUDA)",
-                "Streaming MAD + Seasonal Guard",
+                "Hybrid Ensemble (Model B: Specialist - Recommended)",
+                "Hybrid Ensemble (Model A: Global Generalist)",
+                "Causal TCN-AE (Model B: Specialist - GPU)",
+                "Causal TCN-AE (Model A: Global - GPU)",
+                "Statistical Ensemble (MAD + EWMA)",
+                "Rolling Median + MAD Baseline (B0)",
+                "Streaming EWMA Baseline (B1)",
+                "Causal Isolation Forest Baseline (B2)",
             ],
             index=0,
             label_visibility="collapsed",
         )
 
-    with ctrl_col3:
+    with ctrl_col4:
         stream_mode = st.selectbox(
             "Playback Velocity",
             options=["Smooth Live Oscilloscope (20ms)", "High-Throughput Stream", "Instant Execution"],
@@ -257,7 +286,7 @@ with tab_stream:
             label_visibility="collapsed",
         )
 
-    with ctrl_col4:
+    with ctrl_col5:
         run_stream = st.button("▶ Stream", use_container_width=True)
 
     # Placeholders for Dynamic Real-Time Updates
@@ -265,7 +294,7 @@ with tab_stream:
     chart_placeholder = st.empty()
     incident_placeholder = st.empty()
 
-    # Default idle KPI display
+    # KPI display function
     def render_kpis(ingested: int, total: int, status: str, alerts: int, latency_ms: float):
         status_html = (
             '<span class="status-alert">● ACTIVE INCIDENT</span>'
@@ -300,17 +329,22 @@ with tab_stream:
             unsafe_allow_html=True,
         )
 
-    # Initial render
+    # Load stream data for selected series
     all_stream_pts = list(loader.stream_series(selected_sid))
     total_pts = len(all_stream_pts)
-    render_kpis(0, total_pts, "NORMAL", 0, 0.0)
 
     def build_visual_chart(df_data: pd.DataFrame, height: int = 340) -> alt.VConcatChart:
         # Time-Series Layer
-        base = alt.Chart(df_data).encode(x=alt.X("timestamp:T", axis=alt.Axis(title=None, labelColor="#64748B", gridColor="#161822")))
+        base = alt.Chart(df_data).encode(
+            x=alt.X("timestamp:T", axis=alt.Axis(title=None, labelColor="#64748B", gridColor="#161822"))
+        )
 
         line_obs = base.mark_line(color="#E2C275", strokeWidth=1.8, opacity=0.9).encode(
-            y=alt.Y("observed:Q", title="Observed Metric", axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822")),
+            y=alt.Y(
+                "observed:Q",
+                title="Observed Metric",
+                axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822"),
+            ),
             tooltip=["timestamp:T", "observed:Q", "baseline:Q", "score:Q", "label:N"],
         )
         line_base = base.mark_line(color="#64748B", strokeDash=[3, 3], strokeWidth=1.2, opacity=0.6).encode(
@@ -324,47 +358,103 @@ with tab_stream:
                 tooltip=["timestamp:T", "observed:Q", "score:Q", "event_id:N"],
             )
         )
-        ts_chart = alt.layer(line_obs, line_base, points_anom).properties(height=height, background="transparent")
+        # Note: Do NOT set background on individual layers inside vconcat (Altair requirement)
+        ts_chart = alt.layer(line_obs, line_base, points_anom).properties(height=height)
 
         # Lower Score & Threshold Strip
         line_score = base.mark_line(color="#D4AF37", strokeWidth=1.2).encode(
-            y=alt.Y("score:Q", title="Score", axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822")),
+            y=alt.Y(
+                "score:Q",
+                title="Score",
+                axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822"),
+            ),
             tooltip=["timestamp:T", "score:Q", "threshold:Q"],
         )
         line_thresh = base.mark_line(color="#EF4444", strokeDash=[2, 2], strokeWidth=1.0).encode(
             y="threshold:Q"
         )
-        score_chart = alt.layer(line_score, line_thresh).properties(height=90, background="transparent")
+        score_chart = alt.layer(line_score, line_thresh).properties(height=90)
 
-        return alt.vconcat(ts_chart, score_chart).configure_view(strokeWidth=0)
+        # Top-level VConcatChart owns the background attribute
+        return alt.vconcat(ts_chart, score_chart).properties(background="transparent").configure_view(strokeWidth=0)
+
+    # -------------------------------------------------------------------------
+    # Initial Idle State (Before Streaming Starts)
+    # -------------------------------------------------------------------------
+    if not run_stream:
+        render_kpis(0, total_pts, "NORMAL", 0, 0.0)
+        # Display preview of telemetry
+        preview_count = min(400, total_pts)
+        prev_pts = all_stream_pts[:preview_count]
+        prev_df = pd.DataFrame(
+            [
+                {
+                    "timestamp": p.timestamp,
+                    "observed": p.value,
+                    "baseline": p.value,
+                    "score": 0.0,
+                    "threshold": 6.5,
+                    "label": "NORMAL",
+                    "event_id": "",
+                }
+                for p in prev_pts
+            ]
+        )
+        chart_placeholder.altair_chart(build_visual_chart(prev_df, height=340), use_container_width=True)
+        incident_placeholder.markdown(
+            '<div style="color:#64748B;font-size:0.85rem;padding:8px 0;">'
+            'Telemetry stream loaded. Click <b>▶ Stream</b> above to begin real-time causal processing.'
+            '</div>',
+            unsafe_allow_html=True,
+        )
 
     # -------------------------------------------------------------------------
     # Streaming Execution Engine
     # -------------------------------------------------------------------------
-    if run_stream:
-        # Configure Pipeline
-        chk = "models/sentinel_specialist_best.pt" if "Model B" in model_choice else "models/sentinel_tcn_best.pt"
+    else:
+        # Checkpoint files
+        chk_b = "models/sentinel_specialist_best.pt"
+        chk_a = "models/sentinel_tcn_best.pt"
+
         adapt_cfg = AdaptationConfig(
             enter_threshold=6.5,
             exit_threshold=2.5,
             threshold_mode="likelihood",
             min_event_length=3,
             cooldown_steps=10,
+            warmup_steps=40,
+            likelihood_long_window=600,
+            drift_refresh_steps=40,
         )
 
-        if "Ensemble" in model_choice:
-            detector = HybridEnsembleDetector(checkpoint_path=chk, scale_floor=0.05)
+        if "Hybrid Ensemble" in model_choice:
+            chk = chk_b if "Model B" in model_choice else chk_a
+            detector = HybridEnsembleDetector(checkpoint_path=chk, scale_floor=0.05, mad_window=60, ewma_alpha=0.12)
+            pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
+            pipeline.detector = detector
+            pipeline.layer.detector = detector
+        elif "Statistical Ensemble" in model_choice:
+            detector = HybridEnsembleDetector(checkpoint_path=None, weights=(0.60, 0.40, 0.0), scale_floor=0.05, mad_window=60, ewma_alpha=0.12)
             pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
             pipeline.detector = detector
             pipeline.layer.detector = detector
         elif "TCN-AE" in model_choice:
+            chk = chk_b if "Model B" in model_choice else chk_a
             detector = CausalTCNAEDetector(window_size=32, device="cuda", scale_floor=0.05, checkpoint_path=chk)
             pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
             pipeline.detector = detector
             pipeline.layer.detector = detector
-        else:
-            det_cfg = DetectorConfig(detector_type="rolling_mad", scale_floor=0.05)
+        elif "Rolling Median" in model_choice:
+            det_cfg = DetectorConfig(detector_type="rolling_mad", window_size=60, scale_floor=0.05)
             pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+        elif "EWMA" in model_choice:
+            det_cfg = DetectorConfig(detector_type="ewma", ewma_alpha=0.12, scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+        elif "Isolation Forest" in model_choice:
+            det_cfg = DetectorConfig(detector_type="iforest", iforest_n_estimators=30, scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+        else:
+            pipeline = SentinelPipeline.from_yaml("configs/candidate.yaml")
 
         # Chunk parameters based on velocity
         if "Smooth" in stream_mode:
@@ -403,7 +493,7 @@ with tab_stream:
                 if eid and eid not in unique_events:
                     unique_events[eid] = rec
 
-            # Refresh display at chunk cadence or end
+            # Refresh display at chunk cadence or at completion
             if (idx + 1) % chunk_size == 0 or (idx + 1) == total_pts:
                 elapsed = max(time.perf_counter() - t_start, 1e-4)
                 curr_pts = idx + 1
@@ -417,14 +507,14 @@ with tab_stream:
                     lat_ms,
                 )
 
-                # Draw recent window during live streaming (last 250 points for smooth performance)
+                # Draw recent window during live streaming (last 300 points for smooth performance)
                 disp_df = pd.DataFrame(plot_buffer[-300:])
                 chart_placeholder.altair_chart(build_visual_chart(disp_df), use_container_width=True)
 
                 if sleep_time > 0:
                     time.sleep(sleep_time)
 
-        # Final Render: Full High-Resolution Interactive Stream
+        # Final Render: Full Interactive Stream
         final_df = pd.DataFrame(plot_buffer)
         chart_placeholder.altair_chart(build_visual_chart(final_df, height=360), use_container_width=True)
 
@@ -461,7 +551,7 @@ with tab_stream:
             )
 
 # =============================================================================
-# TAB 2: Benchmark Scorecard (Utkrishta 2026 Protocol)
+# TAB 2: Benchmark & Ablation Scorecard (Utkrishta 2026 Protocol)
 # =============================================================================
 with tab_scorecard:
     st.markdown(
@@ -470,7 +560,7 @@ with tab_scorecard:
         OFFICIAL EVALUATION PROTOCOL · 23,395 STREAMING POINTS
     </div>
     <div style="font-size:1.15rem;font-weight:600;color:#F8FAFC;margin-bottom:14px;">
-        Architectural Baseline Bake-Off & False Alarm Suppression
+        Multi-Baseline Benchmark Scorecard & False Alarm Suppression
     </div>
     """,
         unsafe_allow_html=True,
@@ -490,6 +580,38 @@ with tab_scorecard:
                     "false_positives",
                     "throughput_pts_sec",
                     "latency_ms_pt",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
+
+    if os.path.exists("outputs/ablation_log.csv"):
+        st.markdown(
+            """
+        <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+            ARCHITECTURAL COMPONENT ABLATION STUDY
+        </div>
+        <div style="font-size:1.1rem;font-weight:600;color:#F8FAFC;margin-bottom:12px;">
+            Empirical Validation of Individual Subsystem Contributions
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+        abl_df = pd.read_csv("outputs/ablation_log.csv")
+        st.dataframe(
+            abl_df[
+                [
+                    "ablation_id",
+                    "architecture",
+                    "event_f1",
+                    "precision",
+                    "recall",
+                    "true_positives",
+                    "false_positives",
+                    "false_negatives",
                 ]
             ],
             use_container_width=True,
