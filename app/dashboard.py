@@ -664,6 +664,7 @@ with tab_stream:
         unique_events: dict[str, dict[str, Any]] = {}
 
         t_start = time.perf_counter()
+        stream_progress = st.progress(0, text="🚀 Initializing Sentinel streaming pipeline on GPU...")
 
         for idx, pt in enumerate(all_stream_pts):
             rec = pipeline.process_point(pt)
@@ -699,12 +700,24 @@ with tab_stream:
                     lat_ms,
                 )
 
+                # Update streaming progress bar and live timer
+                stream_progress.progress(
+                    min(1.0, curr_pts / total_pts),
+                    text=f"⏱️ Streaming: {curr_pts:,} / {total_pts:,} pts ({curr_pts/total_pts*100:.1f}%) · Elapsed: {elapsed:.2f}s · {curr_pts/elapsed:.0f} pts/s",
+                )
+
                 # Draw recent window during live streaming (last 300 points for smooth performance)
                 disp_df = pd.DataFrame(plot_buffer[-300:])
                 chart_placeholder.altair_chart(build_visual_chart(disp_df), use_container_width=True)
 
                 if sleep_time > 0:
                     time.sleep(sleep_time)
+
+        elapsed_total = max(time.perf_counter() - t_start, 1e-4)
+        stream_progress.progress(
+            1.0,
+            text=f"✓ Stream Complete: {total_pts:,} points processed in {elapsed_total:.2f}s ({total_pts/elapsed_total:.0f} pts/s) · CUDA Native",
+        )
 
         # Final Render: Full Interactive Stream
         final_df = pd.DataFrame(plot_buffer)

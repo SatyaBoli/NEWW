@@ -30,15 +30,24 @@ th{color:var(--mut);font-weight:500;font-size:11px;letter-spacing:.07em;text-tra
 #ev{max-height:240px;overflow:auto}.e{border-left:2px solid var(--c);padding:6px 12px;margin:8px 0;background:var(--tint);border-radius:0 4px 4px 0}
 @media(max-width:760px){.app{display:block}nav{position:sticky;top:env(safe-area-inset-top,0px);height:auto;display:flex;align-items:center;gap:2px;overflow-x:auto;padding:0 8px;border:0;border-bottom:1px solid var(--line);z-index:10}nav b{display:none}nav button{width:auto;margin:0;padding:12px 12px;border-left:0;border-bottom:2px solid transparent}nav button.on{background:none;border-bottom-color:var(--a)}.lbl{display:none}#mode{padding:0 0 0 8px}#mode button{flex:none}main{padding:22px 14px 48px}h1{font-size:26px}body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);background:var(--bg);z-index:11}}
 @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes radar-pulse{0%{transform:scale(0.85);opacity:0.5}50%{transform:scale(1.25);opacity:1}100%{transform:scale(0.85);opacity:0.5}}
+@keyframes num-pop{0%{transform:scale(1.45);opacity:0.3}100%{transform:scale(1);opacity:1}}
+@keyframes bar-shimmer{0%{background-position:-200px 0}100%{background-position:200px 0}}
+.spin-ring{display:inline-block;width:13px;height:13px;border:2px solid var(--a);border-top-color:transparent;border-radius:50%;animation:spin .75s linear infinite;vertical-align:-1px}
 </style></head><body><div class="app">
 <nav id="nav"><b><span class="mk"></span>Sentinel</b><button data-t="overview" class="on">Overview</button><button data-t="live">Live stream</button><button data-t="anomalies">Anomalies</button><button data-t="analysis">Model Analysis</button><button data-t="lab">Model lab</button><button data-t="corpus">Corpus</button><div class="lbl">Alert filter</div><div id="mode"><button data-m="tuned" class="on">Tuned</button><button data-m="orig">Original</button></div></nav>
 <main id="main"><h1>Adaptive time-series anomaly detection</h1><p class="sub">Challenge 2 on the Numenta Anomaly Benchmark (58 series). Causal detectors, an adaptive threshold and written evidence for every flag, scored with event-based F1.</p>
 <section class="tab" id="t-overview"><div class="grid k" id="kpi"></div><p class="mut" id="tnote"></p>
 <h2>Model comparison</h2><div class="row" id="split"></div><div class="card"><div class="cv" style="height:280px"><canvas id="bars"></canvas></div><div class="lg" id="blg"></div></div></section>
-<section class="tab" id="t-live" hidden><div class="card"><div class="row"><select id="sel" aria-label="Series"></select><select id="model-sel" style="font-weight:600;color:var(--a);border-color:var(--a);padding:6px 10px;" aria-label="Detector Model"><option value="model_b_hybrid">★ Hybrid Ensemble (Model B: Specialist - Champion)</option><option value="model_a_hybrid">Hybrid Ensemble (Model A: Global Generalist)</option><option value="model_b_tcn">Causal TCN-AE (Model B: Specialist - GPU)</option><option value="model_a_tcn">Causal TCN-AE (Model A: Global - GPU)</option><option value="stat_ensemble">Statistical Ensemble (MAD + EWMA)</option><option value="rolling_mad">Rolling Median + MAD Baseline (B0)</option><option value="ewma">Streaming EWMA Baseline (B1)</option><option value="iforest">Causal Isolation Forest Baseline (B2)</option><option value="lof">Causal Local Outlier Factor Baseline (B3)</option><option value="svm">Causal One-Class SVM Baseline (B4)</option></select><button id="btn-run-model" style="background:var(--a);color:#fff;border-color:var(--a);font-weight:600;">⚡ Run Model on Stream</button><button id="play" class="on">❚❚ Pause</button><button id="rst">↺ Restart</button><select id="spd" aria-label="Speed"><option value="1">1×</option><option value="3" selected>3×</option><option value="8">8×</option></select><span id="state" class="badge n">NORMAL</span><span class="mut" id="prog"></span></div>
+<section class="tab" id="t-live" hidden><div class="card"><div class="row" style="align-items:center;gap:8px;flex-wrap:wrap;"><select id="sel" aria-label="Series" style="max-width:200px;"></select><select id="model-sel" style="font-weight:600;color:var(--a);border-color:var(--a);padding:6px 10px;" aria-label="Detector Model"><option value="model_b_hybrid">★ Hybrid Ensemble (Model B: Specialist - Champion)</option><option value="model_a_hybrid">Hybrid Ensemble (Model A: Global Generalist)</option><option value="model_b_tcn">Causal TCN-AE (Model B: Specialist - GPU)</option><option value="model_a_tcn">Causal TCN-AE (Model A: Global - GPU)</option><option value="stat_ensemble">Statistical Ensemble (MAD + EWMA)</option><option value="rolling_mad">Rolling Median + MAD Baseline (B0)</option><option value="ewma">Streaming EWMA Baseline (B1)</option><option value="iforest">Causal Isolation Forest Baseline (B2)</option><option value="lof">Causal Local Outlier Factor Baseline (B3)</option><option value="svm">Causal One-Class SVM Baseline (B4)</option></select><button id="btn-run-model" style="background:var(--a);color:#fff;border-color:var(--a);font-weight:600;display:inline-flex;align-items:center;gap:6px;"><span>⚡ Run Model on Stream</span></button><button id="play" class="on">❚❚ Pause</button><button id="rst" title="Restart Stream from Beginning">↺ Restart</button><button id="btn-prev-anom" title="Jump to Previous Anomaly" style="padding:6px 10px;font-size:12px;">⏮ Prev Alert</button><button id="btn-next-anom" title="Jump to Next Anomaly" style="padding:6px 10px;font-size:12px;font-weight:500;">⏭ Next Alert</button><select id="spd" aria-label="Speed"><option value="1">1×</option><option value="3">3×</option><option value="8" selected>8×</option><option value="20">20× Fast</option><option value="50">50× Turbo</option><option value="120">120× Warp</option></select><div id="stream-timer-pill" style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:6px;background:var(--tint);border:1px solid var(--line);font-family:monospace;font-size:12px;font-weight:600;"><span id="stream-radar-dot" style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#4ADE80;box-shadow:0 0 6px #4ADE80;animation:radar-pulse 1.4s infinite ease-in-out;"></span><span id="stream-timer-display" style="color:var(--ink);">⏱️ 00:00.0</span></div><span id="state" class="badge n">NORMAL</span><span class="mut" id="prog"></span></div>
+<div id="exec-hud" style="display:none;margin:8px 0 12px;padding:12px 16px;background:var(--tint);border:1px solid var(--a);border-radius:8px;box-shadow:0 2px 12px rgba(31,107,102,0.12);"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;"><div style="display:flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--ink);"><span class="spin-ring"></span><span id="exec-hud-title">Executing Sentinel Pipeline on CUDA...</span></div><div style="font-family:monospace;font-weight:700;font-size:13px;color:var(--a);">⏱️ Elapsed: <span id="exec-hud-timer">0.00s</span></div></div><div style="height:6px;width:100%;background:var(--line);border-radius:3px;overflow:hidden;position:relative;"><div id="exec-hud-bar" style="height:100%;width:15%;background:linear-gradient(90deg,var(--a),#4ADE80);border-radius:3px;transition:width 0.15s ease;"></div></div><div style="display:flex;justify-content:space-between;font-size:11px;color:var(--mut);margin-top:6px;"><span id="exec-hud-step">Stage 1/3: Ingesting streaming telemetry...</span><span id="exec-hud-detail">Streaming strictly forward (causal lag order)</span></div></div>
 <input type="range" id="sc" min="0" value="0" style="width:100%" aria-label="Position">
 <div id="live-active-banner" style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;margin:8px 0;background:var(--tint);border-radius:6px;border-left:3px solid var(--a);"><div style="font-size:12px;font-weight:600;color:var(--ink);"><span>Active Model: </span><span id="banner-model-name" style="color:var(--a);">★ Hybrid Ensemble (Model B: Specialist - Champion)</span> · <span id="banner-status" style="color:var(--d);">Causal Lag Order Invariant</span></div><div style="font-size:11px;color:var(--mut);font-family:monospace;" id="banner-latency">1.11 ms/pt · GPU Accelerated</div></div>
+<div style="position:relative;width:100%;">
+<div id="countdown-overlay" style="display:none;position:absolute;inset:0;background:rgba(21,22,20,0.85);backdrop-filter:blur(4px);z-index:20;border-radius:6px;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:20px;"><div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#4ADE80;margin-bottom:4px;">🚀 INFERENCE COMPLETE &amp; BUFFER ARMED</div><div style="font-size:14px;color:var(--ink);opacity:0.9;margin-bottom:8px;">Stream Replay Starting in</div><div id="countdown-big-num" style="font-size:64px;font-weight:800;font-family:monospace;color:var(--a);line-height:1;margin:4px 0 10px;text-shadow:0 0 20px rgba(114,181,170,0.5);">3</div><div id="countdown-subtext" style="font-size:12px;color:var(--mut);margin-bottom:14px;">Positioning causal playhead at probation boundary...</div><div style="display:flex;gap:10px;align-items:center;"><button id="btn-skip-countdown" style="background:var(--a);color:#fff;border-color:var(--a);font-weight:600;padding:7px 18px;border-radius:6px;cursor:pointer;">▶ Start Stream Now</button><button id="btn-pause-countdown" style="background:var(--card);color:var(--ink);border:1px solid var(--line);padding:7px 14px;border-radius:6px;cursor:pointer;">❚❚ Pause at Beginning</button></div><label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--mut);margin-top:12px;cursor:pointer;"><input type="checkbox" id="chk-auto-countdown" checked style="accent-color:var(--a);cursor:pointer;"><span>Enable countdown timer before stream starts</span></label></div>
 <div class="cv" style="height:280px"><canvas id="cs"></canvas></div><div class="cv" style="height:130px"><canvas id="cc"></canvas></div>
+</div>
 <div class="lg"><span><i style="background:var(--sig)"></i>signal</span><span><i style="background:var(--box)"></i>true anomaly window</span><span><i style="background:var(--c)"></i>alert</span><span><i style="background:var(--a)"></i>anomaly score</span><span><i style="background:var(--thr)"></i>adaptive threshold</span></div></div>
 <h2>Alerts as they fire</h2><div class="card" id="ev"></div></section>
 <section class="tab" id="t-anomalies" hidden><div class="row"><select id="fv" aria-label="Verdict"><option value="">All verdicts</option><option value="1">True positives</option><option value="0">False positives</option></select><select id="fs" aria-label="Series"></select><span class="mut" id="cnt"></span></div>
@@ -119,6 +128,9 @@ const best=sp=>Math.max(...MODELS.map(m=>M[m][sp].f1)),fc=(m,sp)=>`<td>${M[m][sp
 $("lab").innerHTML=MODELS.map(m=>`<tr style="cursor:default"><td>${NM[m]}</td><td>${M[m].k}</td>${fc(m,"train")}${fc(m,"test")}${fc(m,"all")}<td>${f2(M[m].all.precision)}</td><td>${f2(M[m].all.recall)}</td><td>${Math.round(M[m].all.delay*100)}%</td><td>${M[m].all.fp}</td></tr>`).join("");
 /* live */
 let cur,key,pos=0,play=true,seen=-1,allSeriesList=[];
+let execTimerInterval=null, countdownInterval=null;
+let streamAccumulatedSec=0, lastFrameTime=performance.now();
+
 keys.forEach(k=>$("sel").insertAdjacentHTML("beforeend",`<option value="${k}">${nm(k)}</option>`));
 const evh=a=>`<div class="e"><b>${a.label}</b> ${a.peak.slice(0,16)} · ${a.true_positive?"✔ inside true window":"✖ false positive"}<br>${esc(a.evidence)}</div>`;
 
@@ -126,34 +138,228 @@ function loadLocal(k){
   key=k;cur=S[k]||S[keys[0]];pos=cur.prob+5;seen=-1;$("sc").max=cur.n;$("sel").value=k;
 }
 
-function drawLive(){const e=Math.floor(pos),n=cur.n,L=34,[x,w,h]=fit($("cs")),X=i=>L+i/(n-1)*(w-L-8),Y=v=>10+(h-20)*(1-(v-cur.mn)/(cur.mx-cur.mn||1));
-x.fillStyle=css("--prob");x.fillRect(L,4,X(cur.prob)-L,h-8);x.fillStyle=css("--box");cur.wi.forEach(([a,b])=>x.fillRect(X(a),4,Math.max(2,X(b)-X(a)),h-8));
-x.fillStyle=css("--al");cur.alerts.forEach(a=>{if(a.ix[0]<e)x.fillRect(X(a.ix[0]),4,Math.max(3,X(Math.min(a.ix[1],e-1))-X(a.ix[0])),h-8)});
-line(x,cur.x,e,X,Y,css("--sig"),1.3);x.fillStyle=css("--c");for(let i=0;i<e;i++)if(cur.flag[i]){x.beginPath();x.arc(X(i),Y(cur.x[i]),2.4,0,7);x.fill()}
-x.fillStyle=css("--mut");x.font="11px system-ui";x.fillText("probation: learning the baseline",L+4,h-8);x.fillStyle=css("--ink");x.fillRect(X(Math.max(0,e-1)),4,1.5,h-8);
-const[y,w2,h2]=fit($("cc")),X2=i=>L+i/(n-1)*(w2-L-8),sy=v=>8+(h2-16)*(1-Math.min(v,cur.sM)/cur.sM);line(y,cur.s,e,X2,sy,css("--a"),1.4);y.setLineDash([5,4]);line(y,cur.thr,e,X2,sy,css("--thr"),1.4,cur.prob);y.setLineDash([]);
-const on=e>0&&cur.flag[e-1],st=$("state");st.textContent=on?"ANOMALOUS":"NORMAL";st.className="badge "+(on?"an":"n");$("prog").textContent=`${e} / ${n} pts · ${cur.t[Math.max(0,e-1)].replace("T"," ")}`;$("sc").value=e;
-const c=cur.alerts.filter(a=>a.ix[0]<e).length;if(c!==seen){seen=c;$("ev").innerHTML=cur.alerts.slice(0,c).reverse().map(evh).join("")||'<span class="mut">No alerts yet.</span>'}}
-function frame(){if(tab=="live"){if(play&&pos<cur.n)pos=Math.min(cur.n,pos+ +$("spd").value*.6);drawLive()}requestAnimationFrame(frame)}
+function updatePlayButton(isPlaying){
+  play = isPlaying;
+  const pBtn = $("play");
+  if(pBtn){
+    pBtn.textContent = isPlaying ? "❚❚ Pause" : "▶ Play";
+    pBtn.classList.toggle("on", isPlaying);
+  }
+  const radar = $("stream-radar-dot");
+  if(radar){
+    radar.style.background = isPlaying ? "#4ADE80" : "var(--mut)";
+    radar.style.boxShadow = isPlaying ? "0 0 6px #4ADE80" : "none";
+    radar.style.animation = isPlaying ? "radar-pulse 1.4s infinite ease-in-out" : "none";
+  }
+}
+
+function updateStreamStopwatch(dtSec){
+  if(play && pos < cur.n){
+    streamAccumulatedSec += dtSec;
+  }
+  const timerDisplay = $("stream-timer-display");
+  if(timerDisplay){
+    const mins = Math.floor(streamAccumulatedSec / 60);
+    const secs = (streamAccumulatedSec % 60).toFixed(1);
+    timerDisplay.textContent = `⏱️ ${String(mins).padStart(2,"0")}:${secs<10?"0":""}${secs}`;
+  }
+}
+
+function drawLive(){
+  const e=Math.floor(pos),n=cur.n,L=34,[x,w,h]=fit($("cs")),X=i=>L+i/(n-1)*(w-L-8),Y=v=>10+(h-20)*(1-(v-cur.mn)/(cur.mx-cur.mn||1));
+  
+  // 1. Shaded probation and ground-truth windows
+  x.fillStyle=css("--prob");x.fillRect(L,4,X(cur.prob)-L,h-8);
+  x.fillStyle=css("--box");cur.wi.forEach(([a,b])=>x.fillRect(X(a),4,Math.max(2,X(b)-X(a)),h-8));
+  
+  // 2. Alert boxes triggered so far
+  x.fillStyle=css("--al");
+  cur.alerts.forEach(a=>{
+    if(a.ix[0]<e)x.fillRect(X(a.ix[0]),4,Math.max(3,X(Math.min(a.ix[1],e-1))-X(a.ix[0])),h-8);
+  });
+
+  // 3. FAINT GHOST WAVEFORM of full series (eliminates "not started" appearance)
+  line(x,cur.x,n,X,Y,"color-mix(in srgb, var(--sig) 22%, transparent)",1.0);
+
+  // 4. ACTIVE SIGNAL up to current playhead e
+  line(x,cur.x,e,X,Y,css("--sig"),1.5);
+
+  // 5. Causal anomaly flag markers up to e
+  x.fillStyle=css("--c");
+  for(let i=0;i<e;i++)if(cur.flag[i]){x.beginPath();x.arc(X(i),Y(cur.x[i]),2.4,0,7);x.fill()}
+
+  // 6. Probation note
+  x.fillStyle=css("--mut");x.font="11px system-ui";x.fillText("probation: learning baseline",L+4,h-8);
+
+  // 7. Scanning Laser Playhead Cursor & Beacon
+  const curX=X(Math.max(0,e-1));
+  const on=e>0&&cur.flag[e-1];
+  x.fillStyle=on?css("--c"):css("--a");
+  x.fillRect(curX,4,2,h-8);
+  if(e>0&&e<=n){
+    const curY=Y(cur.x[e-1]);
+    x.beginPath();x.arc(curX,curY,4.5,0,7);x.fillStyle=on?css("--c"):css("--a");x.fill();
+    x.beginPath();x.arc(curX,curY,8,0,7);x.strokeStyle=on?css("--c"):css("--a");x.lineWidth=1.3;x.stroke();
+  }
+
+  // Bottom Canvas: Score & Threshold
+  const[y,w2,h2]=fit($("cc")),X2=i=>L+i/(n-1)*(w2-L-8),sy=v=>8+(h2-16)*(1-Math.min(v,cur.sM)/cur.sM);
+  y.setLineDash([4,4]);
+  line(y,cur.thr,n,X2,sy,"color-mix(in srgb, var(--thr) 22%, transparent)",1.0,cur.prob);
+  y.setLineDash([]);
+  line(y,cur.s,n,X2,sy,"color-mix(in srgb, var(--a) 18%, transparent)",1.0);
+
+  line(y,cur.s,e,X2,sy,css("--a"),1.4);
+  y.setLineDash([5,4]);
+  line(y,cur.thr,e,X2,sy,css("--thr"),1.4,cur.prob);
+  y.setLineDash([]);
+
+  y.fillStyle=on?css("--c"):css("--a");
+  y.fillRect(curX,4,2,h2-8);
+
+  const st=$("state");st.textContent=on?"ANOMALOUS":"NORMAL";st.className="badge "+(on?"an":"n");
+  $("prog").textContent=`${e} / ${n} pts · ${cur.t[Math.max(0,e-1)].replace("T"," ")}`;
+  $("sc").value=e;
+  const c=cur.alerts.filter(a=>a.ix[0]<e).length;
+  if(c!==seen){seen=c;$("ev").innerHTML=cur.alerts.slice(0,c).reverse().map(evh).join("")||'<span class="mut">No alerts yet.</span>'}
+}
+
+function frame(now){
+  const curT = now || performance.now();
+  const dt = Math.min(0.1, Math.max(0.001, (curT - lastFrameTime) / 1000 || 0.016));
+  lastFrameTime = curT;
+  if(tab=="live"){
+    if(play&&pos<cur.n){
+      pos=Math.min(cur.n,pos+ +$("spd").value*.6);
+      updateStreamStopwatch(dt);
+      if(pos>=cur.n){
+        updatePlayButton(false);
+      }
+    }
+    drawLive();
+  }
+  requestAnimationFrame(frame);
+}
 
 const mSel=$("model-sel"),btnRun=$("btn-run-model");
+
+function startExecutionTimer(modelName, seriesName){
+  if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
+  const cdOverlay=$("countdown-overlay");if(cdOverlay)cdOverlay.style.display="none";
+
+  const hud=$("exec-hud"),hudTitle=$("exec-hud-title"),hudTimer=$("exec-hud-timer"),hudBar=$("exec-hud-bar"),hudStep=$("exec-hud-step");
+  if(hud)hud.style.display="block";
+  if(hudTitle)hudTitle.textContent=`Executing ${modelName} on ${seriesName}...`;
+  if(hudBar)hudBar.style.width="15%";
+  if(hudStep)hudStep.textContent="Stage 1/3: Ingesting streaming telemetry...";
+
+  const t0=performance.now();
+  if(execTimerInterval)clearInterval(execTimerInterval);
+  execTimerInterval=setInterval(()=>{
+    const elapsedSec=((performance.now()-t0)/1000);
+    if(hudTimer)hudTimer.textContent=elapsedSec.toFixed(2)+"s";
+    if(btnRun)btnRun.innerHTML=`<span class="spin-ring"></span> ⏳ <span style="font-family:monospace;font-weight:700;">${elapsedSec.toFixed(1)}s</span>`;
+    if(elapsedSec<0.4){
+      if(hudBar)hudBar.style.width=(15+elapsedSec*50)+"%";
+      if(hudStep)hudStep.textContent="Stage 1/3: Reading telemetry series into buffer...";
+    }else if(elapsedSec<1.2){
+      if(hudBar)hudBar.style.width=(35+(elapsedSec-0.4)*45)+"%";
+      if(hudStep)hudStep.textContent="Stage 2/3: PyTorch Causal Pipeline inference (GPU)...";
+    }else{
+      if(hudBar)hudBar.style.width=Math.min(92,(70+(elapsedSec-1.2)*10))+"%";
+      if(hudStep)hudStep.textContent="Stage 3/3: Evaluating causal likelihood & hysteresis bounds...";
+    }
+  },50);
+  return t0;
+}
+
+function stopExecutionTimer(success,tookSec,details){
+  if(execTimerInterval){clearInterval(execTimerInterval);execTimerInterval=null;}
+  const hud=$("exec-hud"),hudTitle=$("exec-hud-title"),hudTimer=$("exec-hud-timer"),hudBar=$("exec-hud-bar"),hudStep=$("exec-hud-step");
+  if(hudTimer)hudTimer.textContent=tookSec.toFixed(2)+"s";
+  if(hudBar)hudBar.style.width="100%";
+  if(success){
+    if(hudTitle)hudTitle.innerHTML=`<span style="color:#4ADE80;">✓ Execution Complete</span> (${tookSec.toFixed(2)}s)`;
+    if(hudStep)hudStep.textContent=details||"Telemetry fully scored with causal envelope.";
+  }else{
+    if(hudTitle)hudTitle.innerHTML=`<span style="color:var(--c);">⚠ Local Preset Fallback</span>`;
+    if(hudStep)hudStep.textContent="Backend offline or timed out, loaded bundled baseline.";
+  }
+  setTimeout(()=>{if(hud&&!execTimerInterval)hud.style.display="none";},3000);
+}
+
+function triggerStreamStartSequence(){
+  const chkCountdown=$("chk-auto-countdown");
+  const shouldCountdown=chkCountdown?chkCountdown.checked:true;
+  updatePlayButton(false);
+  streamAccumulatedSec=0;
+  updateStreamStopwatch(0);
+
+  if(!shouldCountdown){
+    updatePlayButton(true);
+    return;
+  }
+
+  const overlay=$("countdown-overlay"),numElem=$("countdown-big-num"),subText=$("countdown-subtext");
+  if(!overlay||!numElem){
+    updatePlayButton(true);
+    return;
+  }
+
+  overlay.style.display="flex";
+  let secondsLeft=3;
+  numElem.textContent=String(secondsLeft);
+  numElem.style.color="var(--a)";
+  numElem.style.animation="num-pop 0.3s ease-out";
+  if(subText)subText.textContent=`Positioning causal playhead at probation boundary (pt ${cur.prob})...`;
+
+  if(countdownInterval)clearInterval(countdownInterval);
+  countdownInterval=setInterval(()=>{
+    secondsLeft--;
+    if(secondsLeft>0){
+      numElem.textContent=String(secondsLeft);
+      numElem.style.animation="none";
+      void numElem.offsetWidth;
+      numElem.style.animation="num-pop 0.3s ease-out";
+      if(subText){
+        subText.textContent=secondsLeft===2
+          ?"Arming streaming detector envelope & hysteresis state..."
+          :"Starting live causal oscilloscope stream...";
+      }
+    }else{
+      clearInterval(countdownInterval);
+      countdownInterval=null;
+      numElem.textContent="GO!";
+      numElem.style.color="#4ADE80";
+      setTimeout(()=>{
+        overlay.style.display="none";
+        numElem.style.color="var(--a)";
+        updatePlayButton(true);
+      },400);
+    }
+  },800);
+}
 
 async function runActiveModel(targetKey,targetModel){
   const k=targetKey||key;
   const m=targetModel||(mSel?mSel.value:"model_b_hybrid");
   const modelLabel=mSel?mSel.options[mSel.selectedIndex].text:"Sentinel Model";
-  
+  const seriesLabel=nm(k);
+
   const bModel=$("banner-model-name"),bStat=$("banner-status"),bLat=$("banner-latency");
   if(bModel)bModel.textContent=modelLabel;
   if(bStat){bStat.textContent="Executing SentinelPipeline on CUDA...";bStat.style.color="var(--a)";}
-  if(btnRun){btnRun.disabled=true;btnRun.textContent="⏳ Executing...";}
-  
+  if(btnRun){btnRun.disabled=true;}
+
+  const t0=startExecutionTimer(modelLabel.split("(")[0].trim(),seriesLabel);
+
   try{
     const resp=await fetch("/api/run",{
       method:"POST",
       headers:{"Content-Type":"application/json"},
       body:JSON.stringify({series_id:k,model_id:m})
     });
+    const tookSec=Math.max(0.01,(performance.now()-t0)/1000);
     if(resp.ok){
       const res=await resp.json();
       if(!S[k])S[k]={};
@@ -188,27 +394,73 @@ async function runActiveModel(targetKey,targetModel){
       rows();
       drawLive();
 
+      stopExecutionTimer(true,tookSec,`${res.total_points.toLocaleString()} points scored at ${res.throughput_pts_sec.toLocaleString()} pts/s`);
+
       if(bStat){bStat.textContent="🟢 Live Inference Active (Strict Causal Lag Order)";bStat.style.color="#4ADE80";}
       if(bLat){bLat.textContent=`${res.latency_ms_per_point} ms/pt · ${res.throughput_pts_sec} pts/s · CUDA Native`;}
-      if(btnRun){btnRun.textContent="✓ Executed: "+m.slice(0,16);setTimeout(()=>{btnRun.textContent="⚡ Run Model on Stream";btnRun.disabled=false;},2500);}
+      if(btnRun){
+        btnRun.innerHTML=`✓ Ready (${tookSec.toFixed(2)}s)`;
+        setTimeout(()=>{btnRun.innerHTML="<span>⚡ Run Model on Stream</span>";btnRun.disabled=false;},2500);
+      }
+
+      // Trigger the 3-2-1 countdown sequence for stream start!
+      triggerStreamStartSequence();
       return;
     }
   }catch(err){
     console.warn("Backend /api/run offline, falling back to local replay:",err);
   }
-  
+
+  const tookSec=Math.max(0.01,(performance.now()-t0)/1000);
+  stopExecutionTimer(false,tookSec,"Loaded local replay preset.");
   if(bStat){bStat.textContent="Embedded Preset Replay";bStat.style.color="var(--mut)";}
-  if(btnRun){btnRun.textContent="⚡ Run Model on Stream";btnRun.disabled=false;}
+  if(btnRun){btnRun.innerHTML="<span>⚡ Run Model on Stream</span>";btnRun.disabled=false;}
   loadLocal(k);
+  drawLive();
+  triggerStreamStartSequence();
 }
 
 $("sel").onchange=e=>runActiveModel(e.target.value,mSel?mSel.value:"model_b_hybrid");
 if(mSel)mSel.onchange=e=>runActiveModel(key,e.target.value);
 if(btnRun)btnRun.onclick=()=>runActiveModel(key,mSel?mSel.value:"model_b_hybrid");
-
 $("rst").onclick=()=>runActiveModel(key,mSel?mSel.value:"model_b_hybrid");
-$("sc").oninput=e=>{pos=+e.target.value};
-$("play").onclick=e=>{play=!play;e.target.textContent=play?"❚❚ Pause":"▶ Play";e.target.classList.toggle("on",play)};
+$("sc").oninput=e=>{pos=+e.target.value;drawLive();};
+$("play").onclick=()=>updatePlayButton(!play);
+
+// Countdown overlay action buttons
+const btnSkip=$("btn-skip-countdown");
+if(btnSkip)btnSkip.onclick=()=>{
+  if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
+  const ov=$("countdown-overlay");if(ov)ov.style.display="none";
+  updatePlayButton(true);
+};
+const btnHold=$("btn-pause-countdown");
+if(btnHold)btnHold.onclick=()=>{
+  if(countdownInterval){clearInterval(countdownInterval);countdownInterval=null;}
+  const ov=$("countdown-overlay");if(ov)ov.style.display="none";
+  updatePlayButton(false);
+};
+
+// Jump to Next / Prev Alert
+const btnNext=$("btn-next-anom");
+if(btnNext)btnNext.onclick=()=>{
+  if(!cur||!cur.alerts||cur.alerts.length===0)return;
+  const curr=Math.floor(pos);
+  const next=cur.alerts.find(a=>a.ix[0]>curr+5);
+  if(next){pos=Math.max(0,next.ix[0]-40);}
+  else{pos=Math.max(0,cur.alerts[0].ix[0]-40);}
+  drawLive();
+};
+const btnPrev=$("btn-prev-anom");
+if(btnPrev)btnPrev.onclick=()=>{
+  if(!cur||!cur.alerts||cur.alerts.length===0)return;
+  const curr=Math.floor(pos);
+  const rev=[...cur.alerts].reverse();
+  const prev=rev.find(a=>a.ix[1]<curr-10);
+  if(prev){pos=Math.max(0,prev.ix[0]-40);}
+  else{pos=Math.max(0,cur.alerts[cur.alerts.length-1].ix[0]-40);}
+  drawLive();
+};
 
 /* anomalies */
 let ALL=[],list=[],si=null;
