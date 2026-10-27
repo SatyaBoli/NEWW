@@ -81,9 +81,9 @@ def extract_normal_and_anomalous_windows(
                     is_anom = True
                     break
 
-            # Normalize window
-            mu = float(np.mean(w_vals))
-            std = float(max(np.std(w_vals), 1e-4))
+            # Normalize window using past observations w_vals[:-1] to match causal inference
+            mu = float(np.mean(w_vals[:-1]))
+            std = float(max(np.std(w_vals[:-1]), 1e-4))
             norm_w = ((w_vals - mu) / std).astype(np.float32)
 
             if is_anom:
@@ -127,15 +127,15 @@ def train_tcn_autoencoder(
     print(f"       Clean Normal Windows    : {len(normal_windows)}")
     print(f"       Ground Truth Anomaly Windows: {len(anomaly_windows)}")
 
-    # 80/20 train/validation split on normal regimes
+    # Reproducible seed & Chronological 80/20 train/validation split (no overlapping window leakage)
+    torch.manual_seed(42)
     np.random.seed(42)
-    indices = np.random.permutation(len(normal_windows))
-    split = int(0.8 * len(normal_windows))
-    train_indices = indices[:split]
-    val_indices = indices[split:]
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(42)
 
-    train_set = [normal_windows[i] for i in train_indices]
-    val_set = [normal_windows[i] for i in val_indices]
+    split = int(0.8 * len(normal_windows))
+    train_set = normal_windows[:split]
+    val_set = normal_windows[split:]
 
     train_loader = DataLoader(TimeSeriesWindowDataset(train_set), batch_size=batch_size, shuffle=True, drop_last=True)
     val_loader = DataLoader(TimeSeriesWindowDataset(val_set), batch_size=batch_size, shuffle=False)
@@ -199,7 +199,7 @@ def train_tcn_autoencoder(
     print(f"\n[4/4] Auditing Anomaly Discrimination Ratio on test windows...")
 
     # Load best checkpoint
-    model.load_state_dict(torch.load(output_checkpoint, map_location=dev))
+    model.load_state_dict(torch.load(output_checkpoint, map_location=dev, weights_only=True))
     model.eval()
 
     anom_loss = 0.0

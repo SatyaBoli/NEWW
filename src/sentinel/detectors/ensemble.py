@@ -19,30 +19,26 @@ class HybridEnsembleDetector(BaseDetector):
 
     def __init__(
         self,
-        checkpoint_path: Optional[str] = "models/sentinel_tcn_best.pt",
+        checkpoint_path: Optional[str] = "models/sentinel_specialist_best.pt",
         weights: tuple[float, float, float] = (0.45, 0.25, 0.30),  # (MAD, EWMA, TCN-AE)
         scale_floor: float = 0.05,
+        mad_window: int = 50,
+        ewma_alpha: float = 0.15,
+        tcn_window: int = 32,
         version: str = "ensemble-0.2.0",
     ) -> None:
         self.weights = weights
         self._version = version
         self.scale_floor = scale_floor
 
-        self.mad_detector = RollingMedianMADDetector(window_size=50, warmup_steps=30, scale_floor=scale_floor)
-        self.ewma_detector = EWMADetector(alpha=0.15, warmup_steps=30, scale_floor=scale_floor)
-        self.tcn_detector = CausalTCNAEDetector(window_size=32, warmup_steps=25, scale_floor=scale_floor)
-
-        # Load trained weights if checkpoint exists
-        if checkpoint_path:
-            import os
-            import torch
-            if os.path.exists(checkpoint_path):
-                try:
-                    state_dict = torch.load(checkpoint_path, map_location=self.tcn_detector.device)
-                    self.tcn_detector.net.load_state_dict(state_dict)
-                    self.tcn_detector.net.eval()
-                except Exception as e:
-                    print(f"[Ensemble] Checkpoint load note: {e}")
+        self.mad_detector = RollingMedianMADDetector(window_size=mad_window, warmup_steps=30, scale_floor=scale_floor)
+        self.ewma_detector = EWMADetector(alpha=ewma_alpha, warmup_steps=30, scale_floor=scale_floor)
+        self.tcn_detector = CausalTCNAEDetector(
+            window_size=tcn_window,
+            warmup_steps=25,
+            scale_floor=scale_floor,
+            checkpoint_path=checkpoint_path,
+        )
 
     @property
     def version(self) -> str:

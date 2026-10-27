@@ -1,5 +1,5 @@
 model_id,model_name,checkpoint,event_f1,precision,recall,true_positives,false_positives,false_negatives,throughput_pts_sec,latency_ms_pt,total_points,elapsed_seconds
-Model_A_TCN_Global,Model A (Global TCN-AE),models/sentinel_tcn_best.pt,0.087,0.0667,0.125,1,14,7,860.0,1.163,23395,27.203
-Model_B_TCN_Specialist,Model B (Infra Specialist TCN),models/sentinel_specialist_best.pt,0.129,0.087,0.25,2,21,6,1218.0,0.821,23395,19.208
-Model_A_Hybrid_Ensemble,Ensemble with Model A (Global),models/sentinel_tcn_best.pt,0.2857,0.3333,0.25,2,4,6,1106.6,0.904,23395,21.142
-Model_B_Hybrid_Ensemble,Ensemble with Model B (Specialist),models/sentinel_specialist_best.pt,0.2857,0.3333,0.25,2,4,6,1144.1,0.874,23395,20.449
+Model_A_TCN_Global,Model A (Global TCN-AE),models/sentinel_tcn_best.pt,0.1,0.0833,0.125,1,11,7,605.1,1.653,23395,38.665
+Model_B_TCN_Specialist,Model B (Infra Specialist TCN),models/sentinel_specialist_best.pt,0.0,0.0,0.0,0,9,8,706.9,1.415,23395,33.096
+Model_A_Hybrid_Ensemble,Ensemble with Model A (Global),models/sentinel_tcn_best.pt,0.3077,0.4,0.25,2,3,6,474.5,2.107,23395,49.299
+Model_B_Hybrid_Ensemble,Ensemble with Model B (Specialist),models/sentinel_specialist_best.pt,0.1176,0.1111,0.125,1,8,7,655.4,1.526,23395,35.696

@@ -69,7 +69,6 @@ venv.bak/
 
 # Large datasets and temporary weights
 data/raw/NAB_AI_Training_Dataset.csv
-outputs/predictions.csv
 *.pth
 *.onnx
 checkpoints/*.pt

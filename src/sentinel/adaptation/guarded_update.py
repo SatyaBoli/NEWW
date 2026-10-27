@@ -83,18 +83,21 @@ class AdaptationLayer:
             accepted = True
             codes.append(REGIME_SHIFT_REBASELINE)
 
-        # 5. Drift detection: watches all post-warmup scores
+        # 5. Drift detection: monitors normal observations to detect genuine baseline level shifts
+        # Prevents transient anomalous spikes from triggering spurious drift resets
         drift_fired = False
         if (
             cfg.drift_enabled
             and not dec.in_warmup
             and NON_FINITE_SCORE not in codes
-            and ctx.drift.add(dec.anomaly_score)
         ):
-            drift_fired = True
-            codes.append(DRIFT_RESET)
-            ctx.refresh_left = cfg.drift_refresh_steps
-            ctx.scorer.forget_older_than(ctx.drift.width)
+            if accepted or dec.regime_shift_suspected:
+                drift_val = min(abs(float(out.residual)) / max(abs(float(out.baseline)), 1.0), float(cfg.enter_threshold))
+                if ctx.drift.add(drift_val):
+                    drift_fired = True
+                    codes.append(DRIFT_RESET)
+                    ctx.refresh_left = cfg.drift_refresh_steps
+                    ctx.scorer.forget_older_than(ctx.drift.width)
 
         if not accepted and dec.label == LABEL_NORMAL:
             codes.append(BASELINE_UPDATE_SKIPPED)

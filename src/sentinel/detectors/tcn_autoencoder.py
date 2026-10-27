@@ -102,17 +102,20 @@ class CausalTCNAEDetector(BaseDetector):
             latent_dim=latent_dim,
         ).to(self.device)
 
-        if checkpoint_path and os.path.exists(checkpoint_path):
+        if checkpoint_path:
+            if not os.path.exists(checkpoint_path):
+                raise FileNotFoundError(f"TCN checkpoint not found at: {checkpoint_path}")
             try:
-                state_dict = torch.load(checkpoint_path, map_location=self.device)
+                state_dict = torch.load(checkpoint_path, map_location=self.device, weights_only=True)
                 self.net.load_state_dict(state_dict)
             except Exception as e:
-                print(f"[CausalTCNAEDetector] Checkpoint load note: {e}")
+                raise RuntimeError(f"Failed to load TCN checkpoint from {checkpoint_path}: {e}")
 
         self.net.eval()
 
         self._buffers: dict[str, deque[float]] = {}
         self._residual_history: dict[str, deque[float]] = {}
+        self._last_recon_error: dict[str, float] = {}
 
     @property
     def version(self) -> str:
@@ -138,6 +141,7 @@ class CausalTCNAEDetector(BaseDetector):
             # Warm-up phase
             val = float(point.value)
             med = float(np.median(list(buf))) if n > 0 else val
+            self._last_recon_error[point.series_id] = abs(val - med)
             return RawDetectorOutput(
                 raw_score=0.0,
                 observed=val,
@@ -150,7 +154,7 @@ class CausalTCNAEDetector(BaseDetector):
         seq = list(buf)[-(self.window_size - 1):] + [point.value]
         seq_arr = np.array(seq, dtype=np.float32)
 
-        # Local window normalization for numerical stability
+        # Local window normalization for numerical stability (strictly past stats)
         loc_mean = float(np.mean(seq_arr[:-1]))
         loc_std = float(max(np.std(seq_arr[:-1]), self.scale_floor))
         norm_seq = (seq_arr - loc_mean) / loc_std
@@ -165,8 +169,9 @@ class CausalTCNAEDetector(BaseDetector):
         recon_point = (recon_point_norm * loc_std) + loc_mean
         residual = point.value - recon_point
         abs_err = abs(residual)
+        self._last_recon_error[point.series_id] = float(abs_err)
 
-        # Standardize score against recent residual history
+        # Standardize score against recent residual history of reconstruction errors
         res_buf = self._get_res_history(point.series_id)
         if len(res_buf) >= 10:
             res_arr = np.array(res_buf, dtype=np.float32)
@@ -198,17 +203,19 @@ class CausalTCNAEDetector(BaseDetector):
             if math.isfinite(point.value):
                 buf.append(point.value)
 
-        # Update residual tracking for score calibration
+        # Update residual tracking with real reconstruction errors from clean normal observations
         if not is_anomalous:
             res_buf = self._get_res_history(point.series_id)
-            if len(buf) >= self.window_size:
-                med = float(np.median(list(buf)))
-                res_buf.append(abs(point.value - med))
+            last_err = self._last_recon_error.get(point.series_id)
+            if last_err is not None:
+                res_buf.append(last_err)
 
     def reset_state(self, series_id: Optional[str] = None) -> None:
         if series_id:
             self._buffers.pop(series_id, None)
             self._residual_history.pop(series_id, None)
+            self._last_recon_error.pop(series_id, None)
         else:
             self._buffers.clear()
             self._residual_history.clear()
+            self._last_recon_error.clear()

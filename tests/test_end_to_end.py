@@ -72,3 +72,39 @@ def test_gpu_autoencoder_inference():
     for r in records:
         assert r["anomaly_score"] >= 0.0
         assert r["label"] in ("NORMAL", "ANOMALOUS")
+
+
+def test_full_system_future_perturbation_causality():
+    """Mathematical causality proof: radically perturbing future observations x_{>=t}
+    must leave all past predictions, scores, and baselines at steps < t 100% invariant."""
+    cfg = SentinelConfig(
+        detector=DetectorConfig(detector_type="rolling_mad", window_size=20),
+        adaptation=AdaptationConfig(enter_threshold=3.5, exit_threshold=2.0, warmup_steps=10),
+    )
+
+    base_points = [
+        Point("causal_series", f"2026-01-01T00:{i:02d}:00", 20.0 + (i % 7))
+        for i in range(40)
+    ]
+
+    # Run 1: process first 25 points
+    p1 = SentinelPipeline(cfg)
+    records_clean, _ = p1.process_stream(base_points[:25])
+
+    # Run 2: append extreme wild future values (points 25..40 set to 999,999.0)
+    perturbed_points = list(base_points[:25]) + [
+        Point("causal_series", f"2026-01-01T00:{i:02d}:00", 999999.0)
+        for i in range(25, 40)
+    ]
+    p2 = SentinelPipeline(cfg)
+    records_perturbed, _ = p2.process_stream(perturbed_points)
+
+    # Assert past prefix [0..24] is identical in scores, baselines, and decisions
+    for i in range(25):
+        r_clean = records_clean[i]
+        r_pert = records_perturbed[i]
+        assert r_clean["anomaly_score"] == pytest.approx(r_pert["anomaly_score"], rel=1e-5), f"Past score changed at step {i}!"
+        assert r_clean["evidence"]["baseline"] == pytest.approx(r_pert["evidence"]["baseline"], rel=1e-5), f"Past baseline changed at step {i}!"
+        assert r_clean["evidence"]["residual"] == pytest.approx(r_pert["evidence"]["residual"], rel=1e-5), f"Past residual changed at step {i}!"
+        assert r_clean["label"] == r_pert["label"], f"Past label changed at step {i}!"
+

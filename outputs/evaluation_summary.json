@@ -1,12 +1,12 @@
 {
-  "event_f1": 0.1538,
-  "precision": 0.0909,
-  "recall": 0.5,
-  "true_positives": 1,
-  "false_positives": 10,
-  "false_negatives": 1,
-  "total_true_events": 2,
-  "total_predicted_events": 11,
-  "mean_detection_delay_seconds": 30600.0,
+  "event_f1": 0.375,
+  "precision": 0.375,
+  "recall": 0.375,
+  "true_positives": 3,
+  "false_positives": 5,
+  "false_negatives": 5,
+  "total_true_events": 8,
+  "total_predicted_events": 8,
+  "mean_detection_delay_seconds": 36300.0,
   "median_detection_delay_seconds": 30600.0
 }

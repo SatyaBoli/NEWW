@@ -36,21 +36,30 @@ class NABDataLoader:
     def _resolve_data_path(custom_path: Optional[str]) -> str:
         candidates = [
             custom_path,
+            os.environ.get("NAB_DATA_PATH"),
             os.path.join("data", "raw", "NAB_AI_Training_Dataset.csv"),
-            os.path.join("..", "..", "..", "..", "Downloads", "NAB_AI_Training_Dataset.csv"),
+            os.path.join("data", "NAB_AI_Training_Dataset.csv"),
+            os.path.join("data", "benchmark_test_data.csv"),
+            "NAB_AI_Training_Dataset.csv",
+            os.path.join(os.path.expanduser("~"), "Downloads", "NAB_AI_Training_Dataset.csv"),
             r"C:\Users\satya\Downloads\NAB_AI_Training_Dataset.csv",
         ]
         for p in candidates:
             if p and os.path.exists(p):
                 return os.path.abspath(p)
-        raise FileNotFoundError(f"NAB dataset not found. Checked: {candidates}")
+        raise FileNotFoundError(
+            f"NAB dataset not found. Checked: {[c for c in candidates if c]}. "
+            "Please specify via `--data <path>` or set NAB_DATA_PATH environment variable."
+        )
 
     @staticmethod
     def _resolve_labels_path(custom_path: Optional[str]) -> Optional[str]:
         candidates = [
             custom_path,
+            os.environ.get("NAB_LABELS_PATH"),
             os.path.join("data", "combined_windows.json"),
-            os.path.join("..", "..", "..", "..", "Downloads", "combined_windows.json"),
+            "combined_windows.json",
+            os.path.join(os.path.expanduser("~"), "Downloads", "combined_windows.json"),
             r"C:\Users\satya\Downloads\combined_windows.json",
         ]
         for p in candidates:
@@ -61,16 +70,49 @@ class NABDataLoader:
     def load_df(self) -> pd.DataFrame:
         if self._df is None:
             self._df = pd.read_csv(self.data_path)
+            
+            # Robust schema normalization
+            if "series_id" not in self._df.columns:
+                self._df["series_id"] = "0"
             self._df["series_id"] = self._df["series_id"].astype(str)
             self._df["timestamp"] = self._df["timestamp"].astype(str)
-            self._df["value"] = self._df["value"].astype(float)
+            self._df["value"] = pd.to_numeric(self._df["value"], errors="coerce").fillna(0.0).astype(float)
+
+            if "category" not in self._df.columns:
+                self._df["category"] = "general"
+            else:
+                self._df["category"] = self._df["category"].astype(str)
+
+            if "series_name" not in self._df.columns:
+                self._df["series_name"] = self._df["series_id"].astype(str)
+            else:
+                self._df["series_name"] = self._df["series_name"].astype(str)
+
+            if "has_anomaly_in_series" not in self._df.columns:
+                self._df["has_anomaly_in_series"] = 0
+            else:
+                self._df["has_anomaly_in_series"] = pd.to_numeric(
+                    self._df["has_anomaly_in_series"], errors="coerce"
+                ).fillna(0).astype(int)
+
+            # Sort strictly by timestamp and drop duplicate observations
+            self._df = self._df.drop_duplicates(subset=["series_id", "timestamp"], keep="first")
+            try:
+                self._df["_dt"] = pd.to_datetime(self._df["timestamp"])
+                self._df = self._df.sort_values(by=["series_id", "_dt"]).drop(columns=["_dt"]).reset_index(drop=True)
+            except Exception:
+                self._df = self._df.sort_values(by=["series_id", "timestamp"]).reset_index(drop=True)
+
         return self._df
 
     def load_labels(self) -> dict[str, list[list[str]]]:
         if self._labels is None:
             if self.labels_path and os.path.exists(self.labels_path):
-                with open(self.labels_path, "r", encoding="utf-8") as f:
-                    self._labels = json.load(f)
+                try:
+                    with open(self.labels_path, "r", encoding="utf-8") as f:
+                        self._labels = json.load(f)
+                except Exception:
+                    self._labels = {}
             else:
                 self._labels = {}
         return self._labels
@@ -81,15 +123,18 @@ class NABDataLoader:
         raw_labels = self.load_labels()
         mapping = {}
 
-        unique_series = df.drop_duplicates(subset=["series_id", "category", "series_name"])
+        unique_series = df.drop_duplicates(subset=["series_id"])
         for _, row in unique_series.iterrows():
             sid = str(row["series_id"])
-            cat = str(row["category"])
-            sname = str(row["series_name"])
+            cat = str(row.get("category", "general"))
+            sname = str(row.get("series_name", sid))
 
             # NAB format key: "category/series_name.csv"
             key = f"{cat}/{sname}.csv"
             windows = raw_labels.get(key, [])
+            if not windows:
+                # Direct series_id fallback
+                windows = raw_labels.get(sid, [])
             mapping[sid] = windows
 
         return mapping
@@ -102,9 +147,9 @@ class NABDataLoader:
             last = grp.iloc[-1]
             meta = SeriesMetadata(
                 series_id=str(sid),
-                category=str(first["category"]),
-                series_name=str(first["series_name"]),
-                has_anomaly=bool(first["has_anomaly_in_series"] == 1),
+                category=str(first.get("category", "general")),
+                series_name=str(first.get("series_name", str(sid))),
+                has_anomaly=bool(first.get("has_anomaly_in_series", 0) == 1),
                 num_rows=len(grp),
                 start_time=str(first["timestamp"]),
                 end_time=str(last["timestamp"]),

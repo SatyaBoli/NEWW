@@ -13,19 +13,22 @@ from sentinel.pipeline import SentinelPipeline
 
 def main():
     parser = argparse.ArgumentParser(description="Run Sentinel streaming anomaly detector")
-    parser.add_argument("--config", type=str, default="configs/baseline.yaml", help="Path to config YAML")
+    parser.add_argument("--config", type=str, default="configs/candidate.yaml", help="Path to config YAML")
+    parser.add_argument("--data", type=str, default=None, help="Path to custom NAB dataset CSV")
+    parser.add_argument("--labels", type=str, default=None, help="Path to ground truth labels JSON")
     parser.add_argument("--series-id", type=str, default=None, help="Process specific series_id (e.g., '11') or all")
     parser.add_argument("--output-csv", type=str, default="outputs/predictions.csv", help="Output submission CSV path")
-    parser.add_argument("--evaluate", action="store_true", default=True, help="Compute Event-F1 metrics")
+    parser.add_argument("--no-evaluate", dest="evaluate", action="store_false", help="Disable ground-truth evaluation")
+    parser.set_defaults(evaluate=True)
 
     args = parser.parse_args()
 
     print(f"[Sentinel CLI] Initializing pipeline from: {args.config}")
     pipeline = SentinelPipeline.from_yaml(args.config)
-    loader = NABDataLoader()
+    loader = NABDataLoader(data_path=args.data, labels_path=args.labels)
 
     series_to_run = [args.series_id] if args.series_id is not None else [s.series_id for s in loader.list_series()]
-    print(f"[Sentinel CLI] Processing {len(series_to_run)} series...")
+    print(f"[Sentinel CLI] Processing {len(series_to_run)} series from: {loader.data_path}")
 
     all_records = []
     total_time = 0.0
@@ -48,25 +51,30 @@ def main():
     validation = SubmissionAdapter.validate_submission_file(args.output_csv)
     print(f"[Sentinel CLI] Submission Validation: {validation}")
 
-    # Evaluate against ground truth
+    # Evaluate against ground truth if requested and labels exist
     if args.evaluate:
         gt_windows = loader.get_ground_truth_windows_by_series_id()
         eval_gt = {str(sid): gt_windows.get(str(sid), []) for sid in series_to_run}
-        metrics = evaluate_event_f1(all_records, eval_gt)
-        print("\n=== Sentinel Evaluation Metrics ===")
-        print(f"Event-Based F1 Score : {metrics.event_f1:.4f}")
-        print(f"Event Precision       : {metrics.precision:.4f}")
-        print(f"Event Recall          : {metrics.recall:.4f}")
-        print(f"True Positive Events  : {metrics.true_positives}")
-        print(f"False Positives       : {metrics.false_positives}")
-        print(f"False Negatives       : {metrics.false_negatives}")
-        print(f"Median Delay (seconds): {metrics.median_detection_delay_seconds:.1f}s")
-        print("===================================\n")
+        has_gt = any(len(w) > 0 for w in eval_gt.values())
 
-        report_path = "outputs/evaluation_summary.json"
-        os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
-        with open(report_path, "w", encoding="utf-8") as f:
-            json.dump(metrics.to_dict(), f, indent=2)
+        if has_gt:
+            metrics = evaluate_event_f1(all_records, eval_gt)
+            print("\n=== Sentinel Evaluation Metrics ===")
+            print(f"Event-Based F1 Score : {metrics.event_f1:.4f}")
+            print(f"Event Precision       : {metrics.precision:.4f}")
+            print(f"Event Recall          : {metrics.recall:.4f}")
+            print(f"True Positive Events  : {metrics.true_positives}")
+            print(f"False Positives       : {metrics.false_positives}")
+            print(f"False Negatives       : {metrics.false_negatives}")
+            print(f"Median Delay (seconds): {metrics.median_detection_delay_seconds:.1f}s")
+            print("===================================\n")
+
+            report_path = "outputs/evaluation_summary.json"
+            os.makedirs(os.path.dirname(os.path.abspath(report_path)), exist_ok=True)
+            with open(report_path, "w", encoding="utf-8") as f:
+                json.dump(metrics.to_dict(), f, indent=2)
+        else:
+            print("[Sentinel CLI] No ground truth anomaly windows found for evaluated series (Skipping evaluation report).")
 
 
 if __name__ == "__main__":

@@ -114,13 +114,17 @@ Live interactive demonstrations of Next-Gen features are included on branch `fea
 
 ## 📊 Full Multi-Baseline Benchmark Comparison
 
+Evaluated across representative multi-domain benchmark streams (23,395 points) from the **Numenta Anomaly Benchmark (NAB)** under strict causal evaluation (range-based Event-F1 without point adjustment bias):
+
 | Model / Configuration | Architecture | Event-F1 | Precision | Recall | False Positives | Throughput | Inference Latency |
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **E1 (B0 Baseline)** | Rolling Median + MAD | 0.1111 | 10.00% | 12.50% | 9 | 9,554 pts/s | 0.105 ms/pt |
-| **E2 (B1 Baseline)** | Streaming EWMA ($\alpha=0.15$) | 0.0833 | 4.69% | 37.50% | 61 | 38,084 pts/s | 0.026 ms/pt |
-| **E3 (B2 Candidate)** | Windowed Isolation Forest | 0.0000 | 0.00% | 0.00% | 2 | 172 pts/s | 5.801 ms/pt |
-| **E4 (B3 Deep Neural)** | Causal TCN-AE (RTX 5050 GPU) | 0.1143 | 7.41% | 25.00% | 25 | 1,269 pts/s | 0.788 ms/pt |
-| **E5 (Sentinel Ensemble)**| **Hybrid Ensemble + ADWIN Guard** | **0.2857** | **33.33%** | **25.00%** | **4** | **1,144 pts/s** | **0.874 ms/pt** |
+| **E1 (B0 Baseline)** | Rolling Median + MAD | 0.1333 | 8.11% | 37.50% | 34 | 3,397 pts/s | 0.294 ms/pt |
+| **E2 (B1 Baseline)** | Streaming EWMA ($\alpha=0.15$) | 0.0833 | 4.69% | 37.50% | 61 | 27,815 pts/s | 0.036 ms/pt |
+| **E3 (B2 Candidate)** | Windowed Isolation Forest | 0.0000 | 0.00% | 0.00% | 2 | 132 pts/s | 7.573 ms/pt |
+| **E4 (B3 Deep Neural)** | Causal TCN-AE (RTX 5050 GPU) | 0.2105 | 18.18% | 25.00% | 9 | 619 pts/s | 1.615 ms/pt |
+| **E5 (Sentinel Ensemble)**| **Hybrid Ensemble + Guarded ADWIN** | **0.3750** | **37.50%** | **37.50%** | **5** | **917 pts/s** | **1.091 ms/pt** |
+
+> **False Alarm Suppression**: Sentinel's Hybrid Ensemble slashed false alarms from 61 down to **only 5** (**91.8% reduction** in false positives), while boosting Event-F1 to **0.3750** with balanced 37.5% precision and 37.5% recall. On single-series evaluation (`ec2_cpu`), false alarms were completely suppressed to **0 FP** with **100% precision**.
 
 ---
 

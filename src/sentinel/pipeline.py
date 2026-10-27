@@ -4,6 +4,7 @@ Connects data streaming, causal detectors, adaptation layer, and evidence genera
 """
 from __future__ import annotations
 
+import os
 import time
 from typing import Any, Iterable, Iterator, Optional, Sequence
 
@@ -52,14 +53,30 @@ class SentinelPipeline:
                 contamination=cfg.detector.iforest_contamination,
             )
         elif d_type in ("autoencoder", "tcn", "tcn_ae"):
+            chk = cfg.detector.checkpoint_path
+            if not chk:
+                for cand in ("models/sentinel_specialist_best.pt", "models/sentinel_tcn_best.pt"):
+                    if os.path.exists(cand):
+                        chk = cand
+                        break
             return CausalTCNAEDetector(
-                window_size=32,
+                window_size=cfg.detector.window_size if cfg.detector.window_size <= 64 else 32,
                 device=cfg.detector.ae_device,
+                scale_floor=cfg.detector.scale_floor,
+                checkpoint_path=chk,
             )
         elif d_type in ("ensemble", "hybrid"):
+            chk = cfg.detector.checkpoint_path
+            if not chk:
+                for cand in ("models/sentinel_specialist_best.pt", "models/sentinel_tcn_best.pt"):
+                    if os.path.exists(cand):
+                        chk = cand
+                        break
             return HybridEnsembleDetector(
-                checkpoint_path="models/sentinel_tcn_best.pt",
+                checkpoint_path=chk,
                 scale_floor=cfg.detector.scale_floor,
+                mad_window=cfg.detector.window_size,
+                ewma_alpha=cfg.detector.ewma_alpha,
             )
         else:
             raise ValueError(f"Unknown detector type: {d_type}")

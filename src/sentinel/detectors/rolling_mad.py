@@ -51,7 +51,7 @@ class RollingMedianMADDetector(BaseDetector):
     def _get_seasonal(self, series_id: str) -> deque[float]:
         buf = self._seasonal_buffers.get(series_id)
         if buf is None:
-            buf = self._seasonal_buffers[series_id] = deque(maxlen=self.seasonal_period + 10)
+            buf = self._seasonal_buffers[series_id] = deque(maxlen=self.seasonal_period + max(self.window_size * 2, 60))
         return buf
 
     def score_one(self, point: Point) -> RawDetectorOutput:
@@ -131,9 +131,10 @@ class RollingMedianMADDetector(BaseDetector):
         if point.series_id not in self._warmup_stds and len(loc_buf) >= 30:
             self._warmup_stds[point.series_id] = float(np.std(list(loc_buf)))
 
-        # Update seasonal buffer with all points (for period alignment)
+        # Update seasonal buffer with imputed baseline if anomalous to prevent future contamination
         if math.isfinite(point.value):
-            seas_buf.append(point.value)
+            clean_val = float(np.median(list(loc_buf))) if (is_anomalous and len(loc_buf) > 0) else float(point.value)
+            seas_buf.append(clean_val)
 
         # Guarded update: do not push into local baseline if anomalous
         if not is_anomalous or len(loc_buf) < self.warmup_steps:

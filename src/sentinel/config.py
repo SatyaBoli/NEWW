@@ -75,6 +75,7 @@ class DetectorConfig:
     ae_batch_size: int = 64
     ae_lr: float = 1e-3
     ae_device: str = "cuda"  # auto-detected to cuda if available
+    checkpoint_path: Optional[str] = None
 
 
 @dataclass(frozen=True)

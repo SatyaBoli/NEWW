@@ -6,7 +6,7 @@ from streaming warm-up buffers without requiring manual period specification.
 from __future__ import annotations
 
 import math
-from typing import Optional
+from typing import Optional, Sequence
 
 import numpy as np
 
