@@ -1,17 +1,16 @@
-"""Interactive Streamlit Replay Dashboard for Sentinel Anomaly Detection.
+"""Sentinel: Real-Time Streaming Telemetry Monitor.
 
-Features:
-- Stream series replay with live timeline visualization
-- Ground truth anomaly windows vs predicted alerts overlay
-- Anomaly score and dynamic threshold tracking
-- Detailed evidence inspector card for each detected event
-- Model benchmark comparison scorecard (F1, Precision, Recall, Latency, Throughput)
+A minimal cognitive load, high-signal interface for streaming time-series anomaly detection.
+Styled in dark obsidian and champagne gold, emphasizing live telemetry progression,
+transparent evidence generation, and zero visual clutter.
 """
 from __future__ import annotations
 
 import json
 import os
 import time
+from typing import Any
+
 import altair as alt
 import numpy as np
 import pandas as pd
@@ -25,321 +24,602 @@ from sentinel.evaluation.event_f1 import evaluate_event_f1
 from sentinel.explanations.explainer import generate_explanation
 from sentinel.pipeline import SentinelPipeline
 
-st.set_page_config(page_title="Sentinel - Adaptive Anomaly Detection", layout="wide", page_icon="🛡️")
+# -----------------------------------------------------------------------------
+# Page Configuration & Clean Obsidian/Gold Styling
+# -----------------------------------------------------------------------------
+st.set_page_config(
+    page_title="Sentinel · Streaming Telemetry Monitor",
+    page_icon="●",
+    layout="wide",
+    initial_sidebar_state="collapsed",
+)
 
-st.markdown("""
+st.markdown(
+    """
 <style>
-    .metric-card {
-        background-color: #1e222d;
-        border-radius: 8px;
-        padding: 15px;
-        border-left: 4px solid #4CAF50;
-        margin-bottom: 10px;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+    /* Global Surface */
+    .stApp {
+        background-color: #0A0B0E;
+        color: #E2E8F0;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     }
-    .alert-card {
-        background-color: #2b1f24;
+
+    /* Hide default Streamlit clutter */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    .stDeployButton {display:none;}
+
+    /* Custom Header Container */
+    .sentinel-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        padding-bottom: 12px;
+        border-bottom: 1px solid rgba(226, 194, 117, 0.2);
+        margin-bottom: 20px;
+    }
+    .sentinel-title {
+        font-size: 1.4rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #F8FAFC;
+    }
+    .sentinel-title span {
+        color: #D4AF37; /* Champagne Gold */
+    }
+    .sentinel-subtitle {
+        font-size: 0.85rem;
+        color: #94A3B8;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* KPI Status Metric Cards */
+    .kpi-container {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin: 16px 0;
+    }
+    .kpi-card {
+        background: #111319;
+        border: 1px solid rgba(255, 255, 255, 0.07);
         border-radius: 8px;
-        padding: 15px;
-        border-left: 4px solid #f44336;
-        margin-bottom: 10px;
+        padding: 14px 18px;
+    }
+    .kpi-card-gold {
+        background: #111319;
+        border: 1px solid rgba(212, 175, 55, 0.35);
+        border-radius: 8px;
+        padding: 14px 18px;
+    }
+    .kpi-label {
+        font-size: 0.72rem;
+        font-weight: 600;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: #94A3B8;
+        margin-bottom: 4px;
+    }
+    .kpi-value {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #F8FAFC;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .kpi-value-gold {
+        font-size: 1.35rem;
+        font-weight: 600;
+        color: #E2C275;
+        font-family: 'JetBrains Mono', monospace;
+    }
+    .kpi-sub {
+        font-size: 0.75rem;
+        color: #64748B;
+        margin-top: 2px;
+    }
+
+    /* Status Pills */
+    .status-nominal {
+        color: #4ADE80;
+        font-weight: 600;
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+    }
+    .status-alert {
+        color: #FF5C5C;
+        font-weight: 700;
+        font-size: 0.82rem;
+        letter-spacing: 0.05em;
+    }
+
+    /* Clean Tabs */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 12px;
+        background-color: transparent;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 4px;
+    }
+    .stTabs [data-baseweb="tab"] {
+        padding: 8px 16px;
+        background-color: transparent;
+        border-radius: 6px;
+        color: #94A3B8;
+        font-weight: 500;
+        font-size: 0.88rem;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(212, 175, 55, 0.12) !important;
+        color: #E2C275 !important;
+        border: 1px solid rgba(212, 175, 55, 0.3) !important;
+    }
+
+    /* Buttons */
+    .stButton button {
+        background: linear-gradient(180deg, #1A1D26 0%, #111319 100%);
+        color: #F8FAFC;
+        border: 1px solid rgba(212, 175, 55, 0.4);
+        border-radius: 6px;
+        font-weight: 500;
+        font-size: 0.88rem;
+        transition: all 0.2s ease;
+    }
+    .stButton button:hover {
+        border-color: #E2C275;
+        box-shadow: 0 0 12px rgba(212, 175, 55, 0.25);
+        color: #E2C275;
     }
 </style>
-""", unsafe_allow_html=True)
-
-st.title("🛡️ Sentinel: Adaptive Streaming Time-Series Anomaly Detector")
-st.caption("Utkrishta 2026 AI/ML Hackathon — Challenge 2 (Adaptive Time-Series Anomaly Detection)")
+""",
+    unsafe_allow_html=True,
+)
 
 
 @st.cache_resource
-def get_loader():
+def load_data_engine():
     return NABDataLoader()
 
 
-loader = get_loader()
+loader = load_data_engine()
 series_list = loader.list_series()
 gt_windows = loader.get_ground_truth_windows_by_series_id()
 
-# Sidebar configuration
-st.sidebar.header("⚙️ Configuration")
-detector_choice = st.sidebar.selectbox(
-    "Active Detector",
-    [
-        "Hybrid Ensemble (Model B: Infra Specialist - Recommended)",
-        "Hybrid Ensemble (Model A: Global Generalist)",
-        "Causal TCN-AE (Model B: Infra Specialist - GPU)",
-        "Causal TCN-AE (Model A: Global Generalist - GPU)",
-        "Rolling Median + MAD",
-        "Streaming EWMA",
-        "Isolation Forest",
-    ],
-)
-
-det_type_map = {
-    "Hybrid Ensemble (Model B: Infra Specialist - Recommended)": "ensemble",
-    "Hybrid Ensemble (Model A: Global Generalist)": "ensemble",
-    "Causal TCN-AE (Model B: Infra Specialist - GPU)": "autoencoder",
-    "Causal TCN-AE (Model A: Global Generalist - GPU)": "autoencoder",
-    "Rolling Median + MAD": "rolling_mad",
-    "Streaming EWMA": "ewma",
-    "Isolation Forest": "iforest",
+# Friendly series names mapping
+friendly_names = {
+    "11": "AWS EC2 CPU Utilization (realAWSCloudwatch)",
+    "13": "AWS EC2 CPU 5f5533 (realAWSCloudwatch)",
+    "5": "Art Daily Flat Middle (artificialNoAnomaly)",
+    "7": "Art Daily Jumps Up (artificialWithAnomaly)",
+    "34": "Ambient Temperature Sensor (realKnownCause)",
 }
 
-threshold_mode = st.sidebar.selectbox("Thresholding Logic", ["likelihood", "robust_z"])
-enter_th = st.sidebar.slider("Enter Threshold", 1.5, 12.0, 6.5, 0.1)
-exit_th = st.sidebar.slider("Exit Threshold (Hysteresis)", 1.0, 6.0, 2.5, 0.1)
-drift_guard = st.sidebar.checkbox("Enable ADWIN Drift Guard", value=True)
+# -----------------------------------------------------------------------------
+# Top Navigation & Command Header
+# -----------------------------------------------------------------------------
+st.markdown(
+    """
+<div class="sentinel-header">
+    <div class="sentinel-title">SENTINEL <span>·</span> TELEMETRY</div>
+    <div class="sentinel-subtitle">CAUSAL STREAMING ANOMALY ENGINE · NVIDIA RTX 5050 (CUDA 13.2)</div>
+</div>
+""",
+    unsafe_allow_html=True,
+)
 
-# Series selection
-series_options = {f"{s.series_id}: [{s.category}] {s.series_name}": s.series_id for s in series_list}
-selected_label = st.sidebar.selectbox("Benchmark Series", list(series_options.keys()), index=11)
-selected_sid = series_options[selected_label]
+tab_stream, tab_scorecard, tab_pathway, tab_architecture = st.tabs(
+    [
+        "Live Oscilloscope Stream",
+        "Benchmark Scorecard",
+        "Sentinel 2.0 Innovations",
+        "Causality Guarantees",
+    ]
+)
 
-# Tabs
-tab1, tab2, tab3, tab4 = st.tabs([
-    "📊 Stream Replay & Inspection",
-    "📈 Benchmark Scorecard",
-    "🔬 System Architecture & Explainability",
-    "🚀 Sentinel 2.0 Pathway (Next-Gen)",
-])
+# =============================================================================
+# TAB 1: Live Oscilloscope Stream
+# =============================================================================
+with tab_stream:
+    # Minimalist Control Strip (Horizontal, No Sidebar Cramming)
+    ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4 = st.columns([2.5, 2.5, 1.8, 1.2])
 
-with tab1:
-    col_ctrl1, col_ctrl2 = st.columns([1, 4])
-    with col_ctrl1:
-        run_btn = st.button("▶️ Execute Stream Analysis", type="primary")
+    with ctrl_col1:
+        sid_options = [s.series_id for s in series_list]
+        selected_sid = st.selectbox(
+            "Telemetry Stream",
+            options=sid_options,
+            format_func=lambda s: f"[{s}] {friendly_names.get(s, s)}",
+            index=sid_options.index("11") if "11" in sid_options else 0,
+            label_visibility="collapsed",
+        )
 
-    if run_btn:
-        with st.spinner("Streaming observations through Sentinel pipeline..."):
-            chk = "models/sentinel_specialist_best.pt" if "Model B" in detector_choice else "models/sentinel_tcn_best.pt"
-            d_type = det_type_map[detector_choice]
-            adapt_cfg = AdaptationConfig(
-                enter_threshold=enter_th,
-                exit_threshold=exit_th,
-                threshold_mode=threshold_mode,
-                drift_enabled=drift_guard,
-                min_event_length=3,
-                cooldown_steps=10,
-            )
+    with ctrl_col2:
+        model_choice = st.selectbox(
+            "Detector Architecture",
+            options=[
+                "Model B: Infrastructure Specialist (Ensemble)",
+                "Model A: Global Generalist (Ensemble)",
+                "Model B: Standalone TCN-AE (CUDA)",
+                "Model A: Standalone TCN-AE (CUDA)",
+                "Streaming MAD + Seasonal Guard",
+            ],
+            index=0,
+            label_visibility="collapsed",
+        )
 
-            if d_type == "ensemble":
-                detector = HybridEnsembleDetector(checkpoint_path=chk, scale_floor=0.05)
-                pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
-                pipeline.detector = detector
-                pipeline.layer.detector = detector
-            elif d_type == "autoencoder":
-                detector = CausalTCNAEDetector(window_size=32, device="cuda", scale_floor=0.05, checkpoint_path=chk)
-                pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
-                pipeline.detector = detector
-                pipeline.layer.detector = detector
-            else:
-                det_cfg = DetectorConfig(detector_type=d_type, ae_device="cuda", scale_floor=0.05)
-                pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+    with ctrl_col3:
+        stream_mode = st.selectbox(
+            "Playback Velocity",
+            options=["Smooth Live Oscilloscope (20ms)", "High-Throughput Stream", "Instant Execution"],
+            index=0,
+            label_visibility="collapsed",
+        )
 
-            stream = loader.stream_series(selected_sid)
-            records, stats = pipeline.process_stream(stream)
+    with ctrl_col4:
+        run_stream = st.button("▶ Stream", use_container_width=True)
 
-            # Compute metrics for this series
-            sub_gt = {selected_sid: gt_windows.get(selected_sid, [])}
-            eval_metrics = evaluate_event_f1(records, sub_gt)
+    # Placeholders for Dynamic Real-Time Updates
+    kpi_placeholder = st.empty()
+    chart_placeholder = st.empty()
+    incident_placeholder = st.empty()
 
-            # Metrics bar
-            m1, m2, m3, m4, m5 = st.columns(5)
-            m1.metric("Event-Based F1", f"{eval_metrics.event_f1:.3f}")
-            m2.metric("Precision / Recall", f"{eval_metrics.precision:.2f} / {eval_metrics.recall:.2f}")
-            m3.metric("True Positives / Events", f"{eval_metrics.true_positives} / {eval_metrics.total_true_events}")
-            m4.metric("Throughput", f"{stats['throughput_points_per_sec']:.0f} pts/sec")
-            m5.metric("Latency", f"{stats['latency_ms_per_point']:.2f} ms/pt")
+    # Default idle KPI display
+    def render_kpis(ingested: int, total: int, status: str, alerts: int, latency_ms: float):
+        status_html = (
+            '<span class="status-alert">● ACTIVE INCIDENT</span>'
+            if status == "ANOMALOUS"
+            else '<span class="status-nominal">● NOMINAL</span>'
+        )
+        kpi_placeholder.markdown(
+            f"""
+        <div class="kpi-container">
+            <div class="kpi-card-gold">
+                <div class="kpi-label">Stream Progress</div>
+                <div class="kpi-value-gold">{ingested:,} <span style="font-size:0.85rem;color:#94A3B8;">/ {total:,}</span></div>
+                <div class="kpi-sub">Strict Causal Lag Order</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Telemetry Status</div>
+                <div class="kpi-value">{status_html}</div>
+                <div class="kpi-sub">Anti-Contamination Guard Active</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Confirmed Incidents</div>
+                <div class="kpi-value">{alerts}</div>
+                <div class="kpi-sub">Hysteresis Merged Windows</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">Pipeline Latency</div>
+                <div class="kpi-value">{latency_ms:.2f} <span style="font-size:0.8rem;color:#94A3B8;">ms/pt</span></div>
+                <div class="kpi-sub">RTX 5050 Native Kernels</div>
+            </div>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
 
-            # Prepare plot dataframe
-            plot_rows = []
-            for r in records:
-                ev = r["evidence"]
-                plot_rows.append({
-                    "timestamp": pd.to_datetime(r["timestamp"]),
-                    "observed": ev["observed"],
-                    "baseline": ev["baseline"],
-                    "score": r["anomaly_score"],
-                    "threshold": r["threshold"],
-                    "label": r["label"],
-                    "event_id": r["event_id"],
-                })
-            df_plot = pd.DataFrame(plot_rows)
+    # Initial render
+    all_stream_pts = list(loader.stream_series(selected_sid))
+    total_pts = len(all_stream_pts)
+    render_kpis(0, total_pts, "NORMAL", 0, 0.0)
 
-            # Time series chart
-            st.subheader("Time-Series & Detection Stream")
-            base_chart = alt.Chart(df_plot).encode(x="timestamp:T")
+    def build_visual_chart(df_data: pd.DataFrame, height: int = 340) -> alt.VConcatChart:
+        # Time-Series Layer
+        base = alt.Chart(df_data).encode(x=alt.X("timestamp:T", axis=alt.Axis(title=None, labelColor="#64748B", gridColor="#161822")))
 
-            line_obs = base_chart.mark_line(color="#2196F3", opacity=0.8).encode(
-                y=alt.Y("observed:Q", title="Value / Baseline"),
-                tooltip=["timestamp:T", "observed:Q", "baseline:Q", "score:Q", "label:N"]
-            )
-            line_base = base_chart.mark_line(color="#4CAF50", strokeDash=[4, 4], opacity=0.6).encode(
-                y="baseline:Q"
-            )
-            points_anomaly = base_chart.transform_filter(
-                alt.datum.label == "ANOMALOUS"
-            ).mark_circle(size=60, color="#FF5722").encode(
+        line_obs = base.mark_line(color="#E2C275", strokeWidth=1.8, opacity=0.9).encode(
+            y=alt.Y("observed:Q", title="Observed Metric", axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822")),
+            tooltip=["timestamp:T", "observed:Q", "baseline:Q", "score:Q", "label:N"],
+        )
+        line_base = base.mark_line(color="#64748B", strokeDash=[3, 3], strokeWidth=1.2, opacity=0.6).encode(
+            y="baseline:Q"
+        )
+        points_anom = (
+            base.transform_filter(alt.datum.label == "ANOMALOUS")
+            .mark_circle(size=70, color="#FF5C5C", opacity=0.95)
+            .encode(
                 y="observed:Q",
-                tooltip=["timestamp:T", "observed:Q", "score:Q", "event_id:N"]
+                tooltip=["timestamp:T", "observed:Q", "score:Q", "event_id:N"],
+            )
+        )
+        ts_chart = alt.layer(line_obs, line_base, points_anom).properties(height=height, background="transparent")
+
+        # Lower Score & Threshold Strip
+        line_score = base.mark_line(color="#D4AF37", strokeWidth=1.2).encode(
+            y=alt.Y("score:Q", title="Score", axis=alt.Axis(titleColor="#94A3B8", labelColor="#64748B", gridColor="#161822")),
+            tooltip=["timestamp:T", "score:Q", "threshold:Q"],
+        )
+        line_thresh = base.mark_line(color="#EF4444", strokeDash=[2, 2], strokeWidth=1.0).encode(
+            y="threshold:Q"
+        )
+        score_chart = alt.layer(line_score, line_thresh).properties(height=90, background="transparent")
+
+        return alt.vconcat(ts_chart, score_chart).configure_view(strokeWidth=0)
+
+    # -------------------------------------------------------------------------
+    # Streaming Execution Engine
+    # -------------------------------------------------------------------------
+    if run_stream:
+        # Configure Pipeline
+        chk = "models/sentinel_specialist_best.pt" if "Model B" in model_choice else "models/sentinel_tcn_best.pt"
+        adapt_cfg = AdaptationConfig(
+            enter_threshold=6.5,
+            exit_threshold=2.5,
+            threshold_mode="likelihood",
+            min_event_length=3,
+            cooldown_steps=10,
+        )
+
+        if "Ensemble" in model_choice:
+            detector = HybridEnsembleDetector(checkpoint_path=chk, scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
+            pipeline.detector = detector
+            pipeline.layer.detector = detector
+        elif "TCN-AE" in model_choice:
+            detector = CausalTCNAEDetector(window_size=32, device="cuda", scale_floor=0.05, checkpoint_path=chk)
+            pipeline = SentinelPipeline(SentinelConfig(adaptation=adapt_cfg))
+            pipeline.detector = detector
+            pipeline.layer.detector = detector
+        else:
+            det_cfg = DetectorConfig(detector_type="rolling_mad", scale_floor=0.05)
+            pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
+
+        # Chunk parameters based on velocity
+        if "Smooth" in stream_mode:
+            chunk_size = 25
+            sleep_time = 0.02
+        elif "High-Throughput" in stream_mode:
+            chunk_size = 100
+            sleep_time = 0.005
+        else:
+            chunk_size = total_pts
+            sleep_time = 0.0
+
+        records: list[dict[str, Any]] = []
+        plot_buffer: list[dict[str, Any]] = []
+        unique_events: dict[str, dict[str, Any]] = {}
+
+        t_start = time.perf_counter()
+
+        for idx, pt in enumerate(all_stream_pts):
+            rec = pipeline.process_point(pt)
+            records.append(rec)
+            plot_buffer.append(
+                {
+                    "timestamp": rec["timestamp"],
+                    "observed": rec["evidence"]["observed"],
+                    "baseline": rec["evidence"]["baseline"],
+                    "score": rec["anomaly_score"],
+                    "threshold": rec["threshold"],
+                    "label": rec["label"],
+                    "event_id": rec.get("event_id") or "",
+                }
             )
 
-            chart_ts = alt.layer(line_obs, line_base, points_anomaly).properties(height=320)
-            st.altair_chart(chart_ts, use_container_width=True)
+            if rec["label"] == "ANOMALOUS":
+                eid = rec.get("event_id")
+                if eid and eid not in unique_events:
+                    unique_events[eid] = rec
 
-            # Score & Threshold chart
-            st.subheader("Dynamic Anomaly Score & Hysteresis Threshold")
-            line_score = base_chart.mark_line(color="#E91E63").encode(
-                y=alt.Y("score:Q", title="Anomaly Score"),
-                tooltip=["timestamp:T", "score:Q", "threshold:Q"]
+            # Refresh display at chunk cadence or end
+            if (idx + 1) % chunk_size == 0 or (idx + 1) == total_pts:
+                elapsed = max(time.perf_counter() - t_start, 1e-4)
+                curr_pts = idx + 1
+                lat_ms = (elapsed / curr_pts) * 1000.0
+
+                render_kpis(
+                    curr_pts,
+                    total_pts,
+                    rec["label"],
+                    len(unique_events),
+                    lat_ms,
+                )
+
+                # Draw recent window during live streaming (last 250 points for smooth performance)
+                disp_df = pd.DataFrame(plot_buffer[-300:])
+                chart_placeholder.altair_chart(build_visual_chart(disp_df), use_container_width=True)
+
+                if sleep_time > 0:
+                    time.sleep(sleep_time)
+
+        # Final Render: Full High-Resolution Interactive Stream
+        final_df = pd.DataFrame(plot_buffer)
+        chart_placeholder.altair_chart(build_visual_chart(final_df, height=360), use_container_width=True)
+
+        # Incident Audit Trail
+        if unique_events:
+            st.markdown(
+                f"""
+            <div style="margin-top:20px;margin-bottom:8px;font-size:0.8rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#E2C275;">
+                CONFIRMED INCIDENT LOG ({len(unique_events)} Flagged Windows)
+            </div>
+            """,
+                unsafe_allow_html=True,
             )
-            line_thresh = base_chart.mark_line(color="#FFC107", strokeDash=[3, 3]).encode(
-                y="threshold:Q"
+
+            table_rows = []
+            for eid, r in unique_events.items():
+                expl = generate_explanation(r)
+                table_rows.append(
+                    {
+                        "Incident ID": eid,
+                        "Timestamp": r["timestamp"],
+                        "Observed": f"{expl['observed_value']:.2f}",
+                        "Expected Baseline": f"{expl['expected_baseline']:.2f}",
+                        "Residual Delta": f"{expl['residual']:+.2f} ({expl['percent_deviation']:+.1f}%)",
+                        "Score": f"{r['anomaly_score']:.2f}",
+                        "Trigger Reason": ", ".join(expl["reason_codes"]),
+                    }
+                )
+            incident_placeholder.dataframe(pd.DataFrame(table_rows), use_container_width=True, hide_index=True)
+        else:
+            incident_placeholder.markdown(
+                '<div style="color:#64748B;font-size:0.85rem;padding:8px 0;">No anomaly incidents detected in stream segment. Baseline remained in clean operating regime.</div>',
+                unsafe_allow_html=True,
             )
-            chart_score = alt.layer(line_score, line_thresh).properties(height=180)
-            st.altair_chart(chart_score, use_container_width=True)
 
-            # Evidence cards for detected events
-            st.subheader("🔍 Interpretable Anomaly Evidence Trail")
-            anom_records = [r for r in records if r["label"] == "ANOMALOUS"]
-            if anom_records:
-                unique_events = {}
-                for r in anom_records:
-                    eid = r.get("event_id")
-                    if eid and eid not in unique_events:
-                        unique_events[eid] = r
+# =============================================================================
+# TAB 2: Benchmark Scorecard (Utkrishta 2026 Protocol)
+# =============================================================================
+with tab_scorecard:
+    st.markdown(
+        """
+    <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+        OFFICIAL EVALUATION PROTOCOL · 23,395 STREAMING POINTS
+    </div>
+    <div style="font-size:1.15rem;font-weight:600;color:#F8FAFC;margin-bottom:14px;">
+        Architectural Baseline Bake-Off & False Alarm Suppression
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
-                for eid, r in list(unique_events.items())[:5]:
-                    expl = generate_explanation(r)
-                    with st.expander(f"⚠️ Event [{eid}] at {r['timestamp']} - Score: {r['anomaly_score']:.2f}"):
-                        c1, c2, c3 = st.columns(3)
-                        c1.metric("Observed", f"{expl['observed_value']:.2f}")
-                        c2.metric("Expected Baseline", f"{expl['expected_baseline']:.2f}")
-                        c3.metric("Residual Delta", f"{expl['residual']:+.2f} ({expl['percent_deviation']:+.1f}%)")
-                        st.info(f"**Explanation:** {expl['narrative']}")
-                        st.write(f"**Top Contributing Detectors:** {', '.join(expl['top_contributors'])}")
-                        st.write(f"**Trigger Reason Codes:** `{', '.join(expl['reason_codes'])}`")
-            else:
-                st.success("No anomalies detected in this stream segment.")
+    if os.path.exists("outputs/experiment_log.csv"):
+        exp_df = pd.read_csv("outputs/experiment_log.csv")
+        st.dataframe(
+            exp_df[
+                [
+                    "experiment_id",
+                    "model_name",
+                    "event_f1",
+                    "precision",
+                    "recall",
+                    "true_positives",
+                    "false_positives",
+                    "throughput_pts_sec",
+                    "latency_ms_pt",
+                ]
+            ],
+            use_container_width=True,
+            hide_index=True,
+        )
 
-with tab2:
-    st.subheader("🏆 Model Benchmark Scorecard (Utkrishta 2026 Evaluation Protocol)")
+    st.markdown("<div style='height:16px;'></div>", unsafe_allow_html=True)
 
     if os.path.exists("outputs/model_comparison_scorecard.csv"):
-        st.markdown("### ⚔️ Champion vs. Challenger: Model A (Global) vs. Model B (Specialist)")
-        st.caption(
-            "Empirical bake-off: Model A (Global Generalist trained on all domains) vs. "
-            "Model B (Domain Specialist trained selectively on AWS CloudWatch and Infrastructure telemetry)."
+        st.markdown(
+            """
+        <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+            CHAMPION VS. CHALLENGER COMPARISON
+        </div>
+        <div style="font-size:1.1rem;font-weight:600;color:#F8FAFC;margin-bottom:12px;">
+            Model A (Global Generalist) vs. Model B (Infrastructure Specialist)
+        </div>
+        """,
+            unsafe_allow_html=True,
         )
         cmp_df = pd.read_csv("outputs/model_comparison_scorecard.csv")
         st.dataframe(
-            cmp_df[["model_name", "event_f1", "precision", "recall", "true_positives", "false_positives", "latency_ms_pt", "throughput_pts_sec"]],
+            cmp_df[
+                [
+                    "model_name",
+                    "event_f1",
+                    "precision",
+                    "recall",
+                    "true_positives",
+                    "false_positives",
+                    "throughput_pts_sec",
+                    "latency_ms_pt",
+                ]
+            ],
             use_container_width=True,
+            hide_index=True,
         )
 
-        c_m1, c_m2, c_m3 = st.columns(3)
-        c_m1.metric("Standalone Model B F1", "0.1290", "+48.3% over Model A (0.0870)")
-        c_m2.metric("Standalone Model B Recall", "25.0%", "2.0x higher than Model A (12.5%)")
-        c_m3.metric("Ensemble False Alarms", "4 alerts", "93.4% reduction vs EWMA (23,395 pts)")
+# =============================================================================
+# TAB 3: Sentinel 2.0 Innovations
+# =============================================================================
+with tab_pathway:
+    st.markdown(
+        """
+    <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+        RESEARCH ROADMAP DEMONSTRATION
+    </div>
+    <div style="font-size:1.15rem;font-weight:600;color:#F8FAFC;margin-bottom:16px;">
+        Production-Ready Adaptive Modules (Branch: feature/minimalist-gold-dashboard)
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
-        st.divider()
+    col_inn1, col_inn2 = st.columns(2)
 
-    st.markdown("### 📊 Comprehensive Multi-Baseline Architectural Bake-Off")
-    if os.path.exists("outputs/experiment_log.csv"):
-        exp_df = pd.read_csv("outputs/experiment_log.csv")
-        st.dataframe(exp_df, use_container_width=True)
-
-        col_b1, col_b2 = st.columns(2)
-        with col_b1:
-            st.bar_chart(exp_df.set_index("model_name")["event_f1"])
-        with col_b2:
-            st.bar_chart(exp_df.set_index("model_name")["throughput_pts_sec"])
-    else:
-        st.info("Run `python scripts/run_experiments.py` to generate multi-model benchmark results.")
-
-with tab3:
-    st.subheader("Architecture & Design Guarantees")
-    st.markdown(r"""
-    - **Strict Causality**: Window features and statistics rely exclusively on past observations $t-1, \dots, t-W$. No future data leakage.
-    - **Guarded Adaptation**: Contaminated baseline prevention: anomalous observations are rejected from updating baseline buffers unless regime shift threshold is exceeded.
-    - **ADWIN Drift Engine**: Automatically cuts older reference samples when distribution changes without arbitrary time window guessing.
-    - **Hysteresis Thresholding**: Two-tier thresholding prevents alert flickering. An event enters at $\tau_{enter}$ and only exits below $\tau_{exit}$.
-    - **RTX 5050 Native Acceleration**: Deep Causal TCN-Autoencoder executes on Blackwell CUDA tensors with sub-millisecond inference latency.
-    """)
-
-with tab4:
-    st.subheader("🚀 Sentinel 2.0: The Research & Production Pathway")
-    st.caption("Live demonstrations of Next-Gen features implemented on branch `feature/sentinel-v2-pathway`")
-
-    col_p1, col_p2 = st.columns(2)
-
-    with col_p1:
-        st.markdown("### 1. Conformalized Risk Control (CAD)")
-        st.write("Provides finite-sample statistical guarantees: $P(\\text{False Alarm} \\mid \\text{Normal}) \\le \\alpha$.")
-        alpha_val = st.slider("Target False Alarm Risk (alpha)", 0.005, 0.10, 0.02, 0.005, format="%.3f")
-
+    with col_inn1:
+        st.markdown(
+            """
+        <div class="kpi-card">
+            <div class="kpi-label">1. Conformalized Risk Control (CAD)</div>
+            <p style="font-size:0.85rem;color:#94A3B8;margin-top:6px;">
+                Guarantees finite-sample false alarm risk: <code>P(False Alarm | Normal) &le; &alpha;</code>.
+            </p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
+        alpha_val = st.slider("Target False Alarm Rate (alpha)", 0.005, 0.05, 0.02, 0.005, format="%.3f")
         from sentinel.adaptation.conformal import ConformalAnomalyScorer
+
         scorer = ConformalAnomalyScorer(alpha=alpha_val, calibration_window=500, min_samples=30)
-        # Mock calibration with standard background distribution
         np.random.seed(42)
-        mock_scores = np.abs(np.random.normal(loc=1.5, scale=0.8, size=150)).tolist()
-        for s in mock_scores:
+        for s in np.abs(np.random.normal(loc=1.5, scale=0.8, size=150)).tolist():
             scorer.add_calibration_score(s)
-
         th = scorer.get_threshold()
-        st.success(f"**Conformal Threshold $\\hat{{q}}_{{{1 - alpha_val:.2f}}}$**: `{th:.3f}` (Guaranteed $\\le {alpha_val*100:.1f}\\%$ False Alarm Rate)")
+        st.markdown(
+            f"<div style='font-family:JetBrains Mono;font-size:0.9rem;color:#E2C275;'>Calibrated Conformal Threshold: {th:.3f} (Risk Bound: {alpha_val*100:.1f}%)</div>",
+            unsafe_allow_html=True,
+        )
 
-        test_val = st.number_input("Test Anomaly Score", value=6.5, step=0.5)
-        is_anom, p_val, _ = scorer.evaluate(test_val)
-        if is_anom:
-            st.error(f"⚠️ **Statistically Significant Anomaly!** (Conformal p-value = `{p_val:.4f}` < $\\alpha$)")
-        else:
-            st.info(f"✅ **Normal Observation** (Conformal p-value = `{p_val:.4f}` $\\ge \\alpha$)")
-
-    with col_p2:
-        st.markdown("### 2. Human-in-the-Loop Feedback Bank")
-        st.write("Zero-retrain suppression of verified false alarms via causal cosine similarity matching.")
+    with col_inn2:
+        st.markdown(
+            """
+        <div class="kpi-card">
+            <div class="kpi-label">2. Human-in-the-Loop Feedback Bank</div>
+            <p style="font-size:0.85rem;color:#94A3B8;margin-top:6px;">
+                Causal cosine similarity suppression of approved maintenance windows with ZERO retraining.
+            </p>
+        </div>
+        """,
+            unsafe_allow_html=True,
+        )
         from sentinel.adaptation.feedback import OperatorFeedbackBank
-        fb_bank = OperatorFeedbackBank(similarity_threshold=0.90)
 
+        fb_bank = OperatorFeedbackBank(similarity_threshold=0.90)
         mock_sig = np.array([0.2, 0.5, 1.8, 3.2, 0.8, 0.3], dtype=np.float32)
         rule_id = fb_bank.add_feedback(
-            series_id="service_cluster_A",
+            series_id="service_A",
             feature_vector=mock_sig,
-            reason="Approved Weekly Database Vacuum / Maintenance",
+            reason="Approved Weekly Database Vacuum",
             suppression_weight=0.90,
         )
-        st.info(f"Active Rule Registered: `{rule_id}` (90% Suppression Factor)")
+        st.markdown(
+            f"<div style='font-family:JetBrains Mono;font-size:0.9rem;color:#4ADE80;'>Active Rule: {rule_id} (Suppression Weight: 90%)</div>",
+            unsafe_allow_html=True,
+        )
 
-        incoming_sig = mock_sig + np.random.normal(0, 0.05, len(mock_sig)).astype(np.float32)
-        suppressed, discount, matched = fb_bank.check_suppression("service_cluster_A", incoming_sig)
-        if suppressed:
-            st.success(f"🛡️ **Spurious Alert Suppressed by Rule `{matched}`!** (Score discounted to {discount*100:.0f}%)")
+# =============================================================================
+# TAB 4: Causality Guarantees
+# =============================================================================
+with tab_architecture:
+    st.markdown(
+        """
+    <div style="font-size:0.75rem;letter-spacing:0.1em;font-weight:600;text-transform:uppercase;color:#D4AF37;margin-bottom:4px;">
+        MATHEMATICAL INVARIANTS & VERIFICATION
+    </div>
+    <div style="font-size:1.15rem;font-weight:600;color:#F8FAFC;margin-bottom:14px;">
+        Guarantees Enforced Across Sentinel's Architecture
+    </div>
+    """,
+        unsafe_allow_html=True,
+    )
 
-    st.divider()
-
-    col_p3, col_p4 = st.columns(2)
-
-    with col_p3:
-        st.markdown("### 3. Automated Causal Periodicity Discovery")
-        st.write("Infers dominant streaming period length without manual specification.")
-        from sentinel.features.periodicity import CausalPeriodicityDetector
-        detector = CausalPeriodicityDetector()
-
-        # Load first 600 points of selected series
-        sub_stream = loader.load_df()
-        sub_vals = sub_stream[sub_stream["series_id"] == selected_sid]["value"].values[:600]
-        if len(sub_vals) >= 100:
-            p_discovered, conf = detector.discover_period(sub_vals)
-            if p_discovered:
-                st.success(f"Discovered Dominant Period: **{p_discovered} points** (Confidence: {conf*100:.1f}%)")
-            else:
-                st.info("No prominent recurring cycle detected in warm-up (Defaulting to local non-seasonal window).")
-
-    with col_p4:
-        st.markdown("### 4. High-Performance Edge Compiled Models")
-        st.write("Sub-millisecond inference artifacts exported for edge gateways and Triton Inference Server:")
-        st.code("""
-models/exported/
-├── sentinel_tcn_jit.pt   [TorchScript JIT: 53.6 KB] (Zero-dependency C++ runtime)
-└── sentinel_tcn_pt2.pt   [PyTorch 2.0+ AOT: 61.5 KB] (Traced Ahead-of-Time Graph)
-        """, language="text")
-        st.caption("Measured latency: < 0.25 ms/point on standard CPU; < 0.05 ms/point on GPU.")
+    st.markdown(
+        """
+    - **Strict Causality**: Every feature, baseline, and anomaly score at time $t$ depends exclusively on past context $x_{<t}$. Radically perturbing future observations leaves past predictions 100% bit-for-bit invariant (verified by `test_full_system_future_perturbation_causality`).
+    - **Guarded Baseline Adaptation**: Points classified as anomalous are quarantined from updating rolling reference buffers, preventing prolonged incidents from contaminating normal baselines.
+    - **Guarded ADWIN Drift**: ADWIN monitors normalized residuals of normal accepted points, blocking transient incident spikes from triggering spurious drift resets.
+    - **Hysteresis Dual Thresholding**: High enter ($\tau = 6.5$) and low exit ($\tau = 2.5$) thresholds eliminate alert flapping and boundary oscillations.
+    - **RTX 5050 Native Execution**: Dilated causal 1D convolutions execute with sub-millisecond inference latency on Blackwell CUDA tensors.
+    """
+    )
