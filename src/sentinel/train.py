@@ -37,10 +37,15 @@ class TimeSeriesWindowDataset(Dataset):
 
 
 def extract_normal_and_anomalous_windows(
-    loader: NABDataLoader, window_size: int = 32, stride: int = 4
+    loader: NABDataLoader,
+    window_size: int = 32,
+    stride: int = 4,
+    categories: Optional[list[str]] = None,
 ) -> tuple[list[np.ndarray], list[np.ndarray]]:
     """Extracts strictly clean normal windows and separate ground truth anomaly windows."""
     df = loader.load_df()
+    if categories is not None:
+        df = df[df["category"].isin(categories)]
     gt_windows = loader.get_ground_truth_windows_by_series_id()
 
     normal_windows: list[np.ndarray] = []
@@ -97,6 +102,7 @@ def train_tcn_autoencoder(
     batch_size: int = 256,
     lr: float = 1.5e-3,
     device: str = "cuda",
+    categories: Optional[list[str]] = None,
 ) -> dict[str, float]:
     """Train and fine-tune Causal TCN-AE with validation tracking and anomaly discrimination audit."""
     os.makedirs(os.path.dirname(os.path.abspath(output_checkpoint)), exist_ok=True)
@@ -113,8 +119,11 @@ def train_tcn_autoencoder(
     print(f"=======================================================")
 
     loader = NABDataLoader(data_path=data_path)
-    print("[1/4] Partitioning NAB benchmark into clean normal and anomalous sets...")
-    normal_windows, anomaly_windows = extract_normal_and_anomalous_windows(loader, window_size=window_size, stride=4)
+    cat_msg = f" (filtered to {categories})" if categories else " (all domains)"
+    print(f"[1/4] Partitioning NAB benchmark into clean normal and anomalous sets{cat_msg}...")
+    normal_windows, anomaly_windows = extract_normal_and_anomalous_windows(
+        loader, window_size=window_size, stride=4, categories=categories
+    )
     print(f"       Clean Normal Windows    : {len(normal_windows)}")
     print(f"       Ground Truth Anomaly Windows: {len(anomaly_windows)}")
 

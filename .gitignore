@@ -75,7 +75,8 @@ outputs/predictions.csv
 checkpoints/*.pt
 outputs/checkpoints/*.pt
 
-# Allow committing the lightweight 34KB pre-trained Sentinel model
+# Allow committing lightweight 35KB pre-trained Sentinel models
 *.pt
 !models/sentinel_tcn_best.pt
+!models/sentinel_specialist_best.pt
 

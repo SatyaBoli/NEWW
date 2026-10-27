@@ -6,6 +6,7 @@ latent compression, and reconstruction error anomaly scoring.
 from __future__ import annotations
 
 import math
+import os
 from collections import deque
 from typing import Optional
 
@@ -81,6 +82,7 @@ class CausalTCNAEDetector(BaseDetector):
         latent_dim: int = 16,
         scale_floor: float = 1e-4,
         device: str = "cuda",
+        checkpoint_path: Optional[str] = None,
         version: str = "tcn_ae-0.1.0",
     ) -> None:
         self.window_size = window_size
@@ -99,6 +101,14 @@ class CausalTCNAEDetector(BaseDetector):
             hidden_dim=hidden_dim,
             latent_dim=latent_dim,
         ).to(self.device)
+
+        if checkpoint_path and os.path.exists(checkpoint_path):
+            try:
+                state_dict = torch.load(checkpoint_path, map_location=self.device)
+                self.net.load_state_dict(state_dict)
+            except Exception as e:
+                print(f"[CausalTCNAEDetector] Checkpoint load note: {e}")
+
         self.net.eval()
 
         self._buffers: dict[str, deque[float]] = {}
