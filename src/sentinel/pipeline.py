@@ -11,12 +11,14 @@ from typing import Any, Iterable, Iterator, Optional, Sequence
 from .adaptation.guarded_update import AdaptationLayer
 from .config import SentinelConfig
 from .contracts import Point, PredictionRecord
-from .detectors.base import BaseDetector
-from .detectors.ensemble import HybridEnsembleDetector
-from .detectors.ewma import EWMADetector
-from .detectors.isolation_forest import StreamingIsolationForestDetector
-from .detectors.rolling_mad import RollingMedianMADDetector
-from .detectors.tcn_autoencoder import CausalTCNAEDetector
+from .detectors import (
+    BaseDetector,
+    CausalTCNAEDetector,
+    EWMADetector,
+    HybridEnsembleDetector,
+    RollingMedianMADDetector,
+    StreamingIsolationForestDetector,
+)
 
 
 class SentinelPipeline:

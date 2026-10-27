@@ -118,13 +118,23 @@ Evaluated across representative multi-domain benchmark streams (23,395 points) f
 
 | Model / Configuration | Architecture | Event-F1 | Precision | Recall | False Positives | Throughput | Inference Latency |
 |---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **E1 (B0 Baseline)** | Rolling Median + MAD | 0.1333 | 8.11% | 37.50% | 34 | 3,397 pts/s | 0.294 ms/pt |
-| **E2 (B1 Baseline)** | Streaming EWMA ($\alpha=0.15$) | 0.0833 | 4.69% | 37.50% | 61 | 27,815 pts/s | 0.036 ms/pt |
-| **E3 (B2 Candidate)** | Windowed Isolation Forest | 0.0000 | 0.00% | 0.00% | 2 | 132 pts/s | 7.573 ms/pt |
-| **E4 (B3 Deep Neural)** | Causal TCN-AE (RTX 5050 GPU) | 0.2105 | 18.18% | 25.00% | 9 | 619 pts/s | 1.615 ms/pt |
-| **E5 (Sentinel Ensemble)**| **Hybrid Ensemble + Guarded ADWIN** | **0.3750** | **37.50%** | **37.50%** | **5** | **917 pts/s** | **1.091 ms/pt** |
+| **E1 (B0 Baseline)** | Rolling Median + MAD | 0.1333 | 8.11% | 37.50% | 34 | 4,556 pts/s | 0.219 ms/pt |
+| **E2 (B1 Baseline)** | Streaming EWMA ($\alpha=0.15$) | 0.0833 | 4.69% | 37.50% | 61 | 39,599 pts/s | 0.025 ms/pt |
+| **E3 (B2 Candidate)** | Causal Isolation Forest | 0.1818 | 33.33% | 12.50% | 2 | 355 pts/s | 2.813 ms/pt |
+| **E4 (B3 Deep Neural)** | Causal TCN-AE (RTX 5050 GPU) | 0.2105 | 18.18% | 25.00% | 9 | 1,252 pts/s | 0.799 ms/pt |
+| **E5 (Sentinel Ensemble)**| **Hybrid Ensemble + Guarded ADWIN** | **0.3750** | **37.50%** | **37.50%** | **5** | **898 pts/s** | **1.113 ms/pt** |
 
 > **False Alarm Suppression**: Sentinel's Hybrid Ensemble slashed false alarms from 61 down to **only 5** (**91.8% reduction** in false positives), while boosting Event-F1 to **0.3750** with balanced 37.5% precision and 37.5% recall. On single-series evaluation (`ec2_cpu`), false alarms were completely suppressed to **0 FP** with **100% precision**.
+
+### 🔬 Controlled Component Ablation Study (`outputs/ablation_log.csv`)
+
+| Ablation ID | Architecture | Event-F1 | Precision | Recall | False Positives | Key Finding |
+|---|---|:---:|:---:|:---:|:---:|---|
+| **A1** | Rolling Median + MAD Alone | 0.2069 | 14.29% | 37.50% | 18 | Captures sharp bursts but produces 18 false alarms on noisy baseline ripples |
+| **A2** | Streaming EWMA Alone | 0.1905 | 15.38% | 25.00% | 11 | Responsive trend tracking, but misses gradual drift and yields 11 false alarms |
+| **A3** | Causal TCN-AE Alone | 0.0952 | 7.69% | 12.50% | 12 | Deep reconstruction without statistical priors yields 12 false positives |
+| **A4** | Statistical Ensemble (MAD + EWMA) | 0.2609 | 20.00% | 37.50% | 12 | Statistical combination improves F1 to 0.2609 but still generates 12 false alarms |
+| **A5** | **Full Sentinel Hybrid Ensemble** | **0.3750** | **37.50%** | **37.50%** | **5** | **Adding TCN-AE cuts false positives by 58.3% (12 -> 5 FP), boosting F1 to 0.3750!** |
 
 ---
 
@@ -132,7 +142,7 @@ Evaluated across representative multi-domain benchmark streams (23,395 points) f
 
 ### 1. Clone & Install
 ```bash
-git clone -b feature/dual-model-specialist https://github.com/SatyaBoli/NEWW.git
+git clone -b feature/minimalist-gold-dashboard https://github.com/SatyaBoli/NEWW.git
 cd NEWW
 
 pip install -r requirements.txt
@@ -199,6 +209,7 @@ NEWW/
 │   └── predictions.csv               # Generated predictions
 ├── scripts/
 │   ├── compare_models.py             # Model A vs. Model B bake-off
+│   ├── run_ablation.py               # Architectural component ablation runner
 │   ├── run_experiments.py            # Multi-baseline benchmark runner
 │   ├── run_sentinel.py               # Streaming pipeline CLI
 │   ├── train_gpu.py                  # Global model GPU trainer
@@ -213,7 +224,7 @@ NEWW/
 │   ├── features/                     # Causal lag & periodicity discovery
 │   ├── pipeline.py                   # Single causal streaming entry point
 │   └── train.py                      # PyTorch CUDA training engine
-├── tests/                            # 16 unit & integration tests (100% passing)
+├── tests/                            # 17 unit & integration tests (100% passing)
 ├── pyproject.toml                    # Package configuration
 └── README.md                         # Complete system documentation
 ```

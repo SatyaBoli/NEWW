@@ -1,0 +1,6 @@
+ablation_id,architecture,description,event_f1,precision,recall,true_positives,false_positives,false_negatives,median_delay_sec,throughput_pts_sec,latency_ms_pt,total_points,elapsed_seconds
+A1_MAD_Only,Rolling Median + MAD Alone,Baseline non-parametric point detector without trend or deep temporal awareness.,0.2069,0.1429,0.375,3,18,5,29850.0,3493.6,0.286,23395,6.697
+A2_EWMA_Only,Streaming EWMA Alone,Fast adaptive exponential filter without seasonal or reconstruction gating.,0.1905,0.1538,0.25,2,11,6,45900.0,14244.4,0.07,23395,1.642
+A3_TCN_AE_Only,Causal TCN-AE Alone (RTX 5050),Deep neural reconstruction model without statistical baseline anchoring.,0.0952,0.0769,0.125,1,12,7,65400.0,963.6,1.038,23395,24.278
+A4_Statistical_Ensemble,"Statistical Ensemble (MAD + EWMA, No Deep AE)",Fusion of statistical baselines; neural TCN-AE weight set to 0.0.,0.2609,0.2,0.375,3,12,5,30600.0,638.6,1.566,23395,36.633
+A5_Full_Hybrid_Ensemble,Full Sentinel Hybrid Ensemble (Deep + Statistical + ADWIN),"Complete production architecture combining TCN-AE, MAD, EWMA, and guarded ADWIN.",0.375,0.375,0.375,3,5,5,30600.0,630.4,1.586,23395,37.113

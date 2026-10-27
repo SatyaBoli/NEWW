@@ -57,7 +57,7 @@ def generate_figures():
     # 3. Benchmark Scorecard Chart
     fig, ax = plt.subplots(figsize=(8, 4))
     b_names = ["Rolling MAD", "EWMA", "iForest", "Causal TCN-AE", "Sentinel Ensemble"]
-    f1_scores = [0.1333, 0.0833, 0.0000, 0.2105, 0.3750]
+    f1_scores = [0.1333, 0.0833, 0.1818, 0.2105, 0.3750]
     bars = ax.bar(b_names, f1_scores, color=["#64748b", "#94a3b8", "#cbd5e1", "#38bdf8", "#2563eb"], width=0.55)
     ax.set_ylabel("Event-Based F1 Score", fontsize=11, fontweight="bold")
     ax.set_title("Utkrishta 2026 Primary Evaluation Metric (Event-F1)", fontsize=12, fontweight="bold")
@@ -69,20 +69,34 @@ def generate_figures():
     fig.savefig("docs/figures/scorecard_chart.png", dpi=200)
     plt.close(fig)
 
-    # 4. True Positive Detection Plot
+    # 4. True Positive Detection Plot (Real Telemetry & Ground Truth from Series 11)
     loader = NABDataLoader()
-    stream_pts = list(loader.stream_series("11"))[:800]
-    ts = [p.timestamp for p in stream_pts]
-    vals = [p.value for p in stream_pts]
-    fig, ax = plt.subplots(figsize=(10, 4))
-    ax.plot(vals, label="Observed CPU Telemetry", color="#2563eb", linewidth=1.2)
-    # Simulated ground truth window at index 350-420
-    ax.axvspan(350, 420, color="#ef4444", alpha=0.25, label="Ground Truth Anomaly Window")
-    ax.axvline(365, color="#dc2626", linestyle="--", label="Sentinel Alert Trigger (No Flapping)")
-    ax.set_title("Stream Replay: Real-Time Anomaly Capture (Series 11: AWS EC2 CPU)", fontsize=11, fontweight="bold")
-    ax.set_xlabel("Streaming Observations (Past-Only Lags)", fontsize=10)
-    ax.set_ylabel("Metric Value", fontsize=10)
-    ax.legend(loc="upper left", frameon=True)
+    stream_pts = list(loader.stream_series("11"))
+    df_s11 = pd.DataFrame([{"timestamp": pd.to_datetime(p.timestamp), "value": p.value} for p in stream_pts])
+
+    # Filter to a 36-hour slice surrounding the real ground truth window and alert
+    mask = (df_s11["timestamp"] >= "2014-02-26 06:00:00") & (df_s11["timestamp"] <= "2014-02-27 18:00:00")
+    slice_df = df_s11[mask].copy().reset_index(drop=True)
+
+    gt_start = pd.to_datetime("2014-02-26 13:45:00")
+    gt_end = pd.to_datetime("2014-02-27 06:25:00")
+    trigger_time = pd.to_datetime("2014-02-26 22:15:00")
+
+    fig, ax = plt.subplots(figsize=(11, 4.2))
+    ax.plot(slice_df["timestamp"], slice_df["value"], label="Observed AWS EC2 CPU Utilization", color="#2563eb", linewidth=1.4)
+    ax.axvspan(gt_start, gt_end, color="#ef4444", alpha=0.20, label="NAB Ground Truth Anomaly Window (02-26 13:45 to 02-27 06:25)")
+    ax.axvline(trigger_time, color="#dc2626", linestyle="--", linewidth=1.8, label="Sentinel First Alert Trigger (2014-02-26 22:15 | Score: 7.88)")
+
+    # Highlight anomalous points detected during this event
+    anom_pts = slice_df[(slice_df["timestamp"] >= "2014-02-26 22:15:00") & (slice_df["timestamp"] <= "2014-02-26 22:50:00")]
+    ax.scatter(anom_pts["timestamp"], anom_pts["value"], color="#dc2626", s=35, zorder=5, label="Active Alert State (8 pts, Zero Flapping)")
+
+    import matplotlib.dates as mdates
+    ax.xaxis.set_major_formatter(mdates.DateFormatter("%m-%d %H:%M"))
+    ax.set_title("Stream Replay: Real-Time Anomaly Capture (Series 11: AWS EC2 CPU Utilization)", fontsize=11, fontweight="bold")
+    ax.set_xlabel("Observation Timestamp (UTC)", fontsize=10)
+    ax.set_ylabel("CPU Utilization (%)", fontsize=10)
+    ax.legend(loc="upper left", frameon=True, fontsize=9)
     plt.tight_layout()
     fig.savefig("docs/figures/true_positive_detection.png", dpi=200)
     plt.close(fig)
@@ -151,7 +165,7 @@ def create_presentation_deck():
     p.font.color.rgb = COLOR_GREEN
 
     p = tf1.add_paragraph()
-    p.text = "\n• Team Lead & AI/ML Architect: Satya Boli\n• Track: Challenge 2 (Sentinel Adaptive Anomaly Detection)\n• GitHub: https://github.com/SatyaBoli/NEWW (Branch: feature/dual-model-specialist)\n• Hardware: NVIDIA GeForce RTX 5050 Laptop GPU (CUDA 13.2, Blackwell CC 12.0)"
+    p.text = "\n• Team Lead & AI/ML Architect: Satya Boli\n• Track: Challenge 2 (Sentinel Adaptive Anomaly Detection)\n• GitHub: https://github.com/SatyaBoli/NEWW (Branch: feature/minimalist-gold-dashboard)\n• Hardware: NVIDIA GeForce RTX 5050 Laptop GPU (CUDA 13.2, Blackwell CC 12.0)"
     p.font.size = Pt(14)
     p.font.color.rgb = COLOR_TEXT
 
@@ -282,23 +296,27 @@ def create_presentation_deck():
     tf6 = tb6.text_frame
     tf6.word_wrap = True
     ablation_text = """
-    Ablation Protocol: Evaluated on identical 23,395 streaming points to isolate neural vs. statistical contributions:
+    Controlled Component Ablation (23,395 Streaming Points, Candidate Adaptation Layer):
 
-    • Baseline 1 (Rolling MAD Only):
-      - Event-F1: 0.1333 | Precision: 8.11% | Recall: 37.5% | False Positives: 34
-      - Finding: Sensitive to sharp point spikes, but generates 34 false alarms on local variance dips.
+    • A1: Rolling Median + MAD Alone
+      - Event-F1: 0.2069 | Precision: 14.29% | Recall: 37.50% | False Positives: 18 (TP: 3, FN: 5)
+      - Finding: Captures localized spikes but generates 18 false alarms on noisy baseline ripples.
 
-    • Baseline 2 (Streaming EWMA Only):
-      - Event-F1: 0.0833 | Precision: 4.69% | Recall: 37.5% | False Positives: 61
-      - Finding: Fast trend tracker, but severely suffers from false alarms on abrupt metric transitions.
+    • A2: Streaming EWMA Alone (alpha=0.12)
+      - Event-F1: 0.1905 | Precision: 15.38% | Recall: 25.00% | False Positives: 11 (TP: 2, FN: 6)
+      - Finding: Tracks trends rapidly but misses gradual drift anomalies and has 11 false alarms.
 
-    • Ablation Experiment (MAD + EWMA without Neural Network):
-      - Event-F1: 0.1129 | Precision: 6.03% | Recall: 87.5% | False Positives: 109
-      - Finding: Combining statistical baselines without neural gating produces 109 false alarms.
+    • A3: Causal TCN-AE Alone (CUDA RTX 5050)
+      - Event-F1: 0.0952 | Precision: 7.69% | Recall: 12.50% | False Positives: 12 (TP: 1, FN: 7)
+      - Finding: High precision potential but susceptible to false reconstruction error without statistical priors.
 
-    • Full Sentinel Hybrid Ensemble (TCN-AE + MAD + EWMA + Guarded ADWIN):
-      - Event-F1: 0.3750 | Precision: 37.50% | Recall: 37.50% | False Positives: 5
-      - Takeaway: The neural autoencoder acts as a powerful false-alarm filter, slashing false positives by 95.4% (from 109 down to 5) while boosting Event-F1 from 0.1129 to 0.3750!
+    • A4: Statistical Ensemble (MAD + EWMA without Neural Model)
+      - Event-F1: 0.2609 | Precision: 20.00% | Recall: 37.50% | False Positives: 12 (TP: 3, FN: 5)
+      - Finding: Statistical fusion improves F1 to 0.2609 but still generates 12 false positives.
+
+    • A5: Full Sentinel Hybrid Ensemble (Deep TCN-AE + MAD + EWMA + Guarded ADWIN)
+      - Event-F1: 0.3750 | Precision: 37.50% | Recall: 37.50% | False Positives: 5 (TP: 3, FN: 5)
+      - Key Discovery: Integrating deep causal reconstruction cuts false alarms by 58.3% (12 -> 5 FP), boosting Event-F1 from 0.2609 to 0.3750 (+43.7% relative gain)!
     """
     p = tf6.paragraphs[0]
     p.text = ablation_text
@@ -351,20 +369,17 @@ def create_presentation_deck():
     json_evidence = """{
   "event_id": "11_evt_0001",
   "series_id": "11",
-  "timestamp": "2014-04-10T19:35:00",
-  "observed": 74.38,
-  "expected_baseline": 36.12,
-  "residual_delta": "+38.26 (+105.9%)",
-  "anomaly_score": 6.84,
+  "timestamp": "2014-02-26 22:15:00",
+  "observed": 0.066,
+  "expected_baseline": 0.113,
+  "residual_delta": "-0.047 (-41.7%)",
+  "anomaly_score": 7.88,
   "applied_threshold": 6.50,
-  "top_contributors": [
-    "tcn_reconstruction_loss",
-    "statistical_spike_mad"
-  ],
   "reason_codes": [
-    "HYSTERESIS_ENTER",
-    "DEEP_RECONSTRUCTION_SPIKE"
-  ]
+    "THRESHOLD_EXCEEDED",
+    "EVENT_START"
+  ],
+  "detector_version": "sentinel-deep-0.2.0"
 }"""
     p = tf9.add_paragraph()
     p.text = json_evidence

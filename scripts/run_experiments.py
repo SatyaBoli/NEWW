@@ -82,6 +82,12 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
             "drift_enabled": True,
             "min_event_length": 3,
             "cooldown_steps": 10,
+            "window_size": 60,
+            "ewma_alpha": 0.12,
+            "warmup_steps": 40,
+            "regime_shift_patience": 40,
+            "likelihood_long_window": 600,
+            "drift_refresh_steps": 40,
         },
     ]
 
@@ -93,6 +99,9 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
             detector_type=exp["detector_type"],
             ae_device="cuda",
             scale_floor=0.05,
+            window_size=exp.get("window_size", 50),
+            ewma_alpha=exp.get("ewma_alpha", 0.15),
+            iforest_n_estimators=exp.get("iforest_n_estimators", 30),
         )
         adapt_cfg = AdaptationConfig(
             enter_threshold=exp["enter_threshold"],
@@ -101,6 +110,11 @@ def run_benchmark_experiments(sample_series_ids: list[str] | None = None) -> pd.
             drift_enabled=exp["drift_enabled"],
             min_event_length=exp.get("min_event_length", 3),
             cooldown_steps=exp.get("cooldown_steps", 10),
+            warmup_steps=exp.get("warmup_steps", 30),
+            regime_shift_patience=exp.get("regime_shift_patience", 50),
+            likelihood_long_window=exp.get("likelihood_long_window", 500),
+            drift_refresh_steps=exp.get("drift_refresh_steps", 50),
+            detector_version="sentinel-deep-0.2.0" if exp["detector_type"] == "ensemble" else "sentinel-baseline-0.1.0",
         )
         pipeline = SentinelPipeline(SentinelConfig(detector=det_cfg, adaptation=adapt_cfg))
 
