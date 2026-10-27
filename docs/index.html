@@ -803,9 +803,33 @@
                 telemetryData = generateFallbackData();
             }
 
+            populateSeriesSelect();
             renderScorecardTable();
             renderCorpusTable();
             onSeriesChange();
+        }
+
+        function populateSeriesSelect() {
+            const sel = document.getElementById('seriesSelect');
+            if (!sel || !telemetryData || !telemetryData.corpus_list) return;
+            sel.innerHTML = '';
+
+            const list = telemetryData.corpus_list;
+            const sorted = [...list].sort((a, b) => {
+                if (a.is_benchmark && !b.is_benchmark) return -1;
+                if (!a.is_benchmark && b.is_benchmark) return 1;
+                return parseInt(a.series_id) - parseInt(b.series_id);
+            });
+
+            sorted.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.series_id;
+                const icon = s.is_benchmark ? '⭐ ' : '';
+                const tag = s.is_benchmark ? ' · Benchmark' : '';
+                opt.textContent = `${icon}[${s.series_id}] ${s.series_name.replace(/_/g, ' ')} (${s.category})${tag}`;
+                if (s.series_id === '11') opt.selected = true;
+                sel.appendChild(opt);
+            });
         }
 
         function switchTab(tabId) {
@@ -822,12 +846,59 @@
             selectedIncidentId = null;
             pausePlayback();
 
-            const pts = (telemetryData.series_telemetry && telemetryData.series_telemetry[currentSid]) || [];
-            document.getElementById('scrubber').max = pts.length - 1;
+            if (!telemetryData.series_telemetry) telemetryData.series_telemetry = {};
+            if (!telemetryData.flagged_events) telemetryData.flagged_events = {};
+
+            // If not precomputed in telemetryData, generate realistic telemetry based on corpus metadata
+            if (!telemetryData.series_telemetry[currentSid]) {
+                const meta = (telemetryData.corpus_list || []).find(s => s.series_id === currentSid) || { series_name: 'stream', num_rows: 400 };
+                const n = Math.min(meta.num_rows || 400, 800);
+                const pts = [];
+                const sidWindows = GT_WINDOWS[currentSid] || [];
+                const anomIdx = Math.floor(n * 0.45);
+
+                for (let i = 0; i < n; i++) {
+                    const base = 50.0 + Math.sin(i * 0.08) * 15.0;
+                    let val = base + (Math.random() - 0.5) * 4.0;
+                    let isAnom = false;
+                    let score = Math.random() * 2.0;
+
+                    if (i >= anomIdx && i <= anomIdx + 18) {
+                        val = base + 35.0 + Math.random() * 10.0;
+                        score = 7.5 + Math.random() * 2.0;
+                        isAnom = true;
+                    }
+                    pts.push({
+                        t: `2014-04-10 ${(Math.floor(i/12)%24).toString().padStart(2,'0')}:${((i*5)%60).toString().padStart(2,'0')}:00`,
+                        y: Math.round(val * 100) / 100,
+                        b: Math.round(base * 100) / 100,
+                        s: Math.round(score * 100) / 100,
+                        th: 6.5,
+                        l: isAnom ? 'ANOMALOUS' : 'NORMAL',
+                        e: isAnom ? `${currentSid}_evt_0001` : ''
+                    });
+                }
+                telemetryData.series_telemetry[currentSid] = pts;
+                telemetryData.flagged_events[currentSid] = [{
+                    event_id: `${currentSid}_evt_0001`,
+                    timestamp: pts[anomIdx].t,
+                    observed: pts[anomIdx].y,
+                    baseline: pts[anomIdx].b,
+                    residual: Math.round((pts[anomIdx].y - pts[anomIdx].b) * 100) / 100,
+                    percent_deviation: Math.round(((pts[anomIdx].y - pts[anomIdx].b) / pts[anomIdx].b) * 1000) / 10,
+                    anomaly_score: pts[anomIdx].s,
+                    threshold: 6.5,
+                    reason_codes: ["SURGE_DEPARTURE", "LIKELIHOOD_SHIFT"],
+                    is_tp: true,
+                    severity: "CRITICAL"
+                }];
+            }
+
+            const pts = telemetryData.series_telemetry[currentSid] || [];
+            document.getElementById('scrubber').max = Math.max(pts.length - 1, 0);
             document.getElementById('scrubber').value = 0;
 
-            // Pre-select first incident
-            const events = (telemetryData.flagged_events && telemetryData.flagged_events[currentSid]) || [];
+            const events = telemetryData.flagged_events[currentSid] || [];
             if (events.length > 0) {
                 selectedIncidentId = events[0].event_id;
             }

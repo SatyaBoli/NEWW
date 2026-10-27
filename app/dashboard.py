@@ -318,27 +318,60 @@ with tab_stream:
     ctrl_col1, ctrl_col2, ctrl_col3, ctrl_col4, ctrl_col5 = st.columns([1.6, 2.6, 2.4, 1.8, 1.2])
 
     with ctrl_col1:
+        category_options = [
+            "All 58 Datasets (Corpus)",
+            "⭐ Evaluated Benchmark (5)",
+            "realAWSCloudwatch (17)",
+            "realKnownCause (7)",
+            "realAdExchange (6)",
+            "realTraffic (7)",
+            "realTweets (10)",
+            "artificialWithAnomaly (6)",
+            "artificialNoAnomaly (5)",
+        ]
         stream_subset = st.selectbox(
-            "Stream Subset",
-            options=["Evaluated Benchmark (5)", "All Streams (Full Corpus)"],
+            "Filter Category",
+            options=category_options,
             index=0,
             label_visibility="collapsed",
         )
 
     with ctrl_col2:
-        if stream_subset == "Evaluated Benchmark (5)":
+        if "Evaluated Benchmark" in stream_subset:
             available_sids = [sid for sid in BENCHMARK_SIDS if sid in series_meta_dict]
-            # Fallback if benchmark series not populated
-            if not available_sids:
-                available_sids = [s.series_id for s in series_list[:5]]
+        elif "realAWSCloudwatch" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "realAWSCloudwatch"]
+        elif "realKnownCause" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "realKnownCause"]
+        elif "realAdExchange" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "realAdExchange"]
+        elif "realTraffic" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "realTraffic"]
+        elif "realTweets" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "realTweets"]
+        elif "artificialWithAnomaly" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "artificialWithAnomaly"]
+        elif "artificialNoAnomaly" in stream_subset:
+            available_sids = [s.series_id for s in series_list if s.category == "artificialNoAnomaly"]
         else:
+            # All 58 series: benchmark first, then all others numerically sorted
+            bench_part = [sid for sid in BENCHMARK_SIDS if sid in series_meta_dict]
+            other_part = sorted(
+                [s.series_id for s in series_list if s.series_id not in BENCHMARK_SIDS],
+                key=lambda x: int(x) if x.isdigit() else 999,
+            )
+            available_sids = bench_part + other_part
+
+        if not available_sids:
             available_sids = [s.series_id for s in series_list]
+
+        default_idx = available_sids.index("11") if "11" in available_sids else 0
 
         selected_sid = st.selectbox(
             "Telemetry Stream",
             options=available_sids,
             format_func=format_series_label,
-            index=available_sids.index("11") if "11" in available_sids else 0,
+            index=default_idx,
             label_visibility="collapsed",
         )
 
